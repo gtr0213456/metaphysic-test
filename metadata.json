@@ -1,0 +1,7 @@
+{
+  "name": "Aetheris - Metaphysical Life OS",
+  "description": "A high-end metaphysical relationship and life management system featuring Bazi, Human Design, and Tzolkin energy tracking with bilingual support.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
