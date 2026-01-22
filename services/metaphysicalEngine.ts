@@ -1,4 +1,3 @@
-
 import { UserProfile, MetaphysicalSystemData, RelationshipSynergy, SynergyMetric } from '../types';
 
 export class MetaphysicalEngine {
@@ -14,7 +13,39 @@ export class MetaphysicalEngine {
     ];
   }
 
+  // 生命靈數計算邏輯
+  private static calculateLifePath(birthday: string): number {
+    // 移除所有非數字字元 (例如 1990-01-20 -> 19900120)
+    const digits = birthday.replace(/\D/g, '');
+    if (!digits) return 0;
+
+    const reduce = (numStr: string): number => {
+      const sum = numStr.split('').reduce((acc, d) => acc + parseInt(d, 10), 0);
+      return sum > 9 ? reduce(sum.toString()) : sum;
+    };
+
+    return reduce(digits);
+  }
+
+  static getNumerology(user: UserProfile): MetaphysicalSystemData {
+    const lifePath = this.calculateLifePath(user.birthday || '2000-01-01');
+
+    return {
+      id: `num-${user.id}`,
+      type: 'NUMEROLOGY',
+      title: { en: 'Core Numerology', cn: '生命靈數' },
+      summary: { en: 'Vibrational frequency of birth date.', cn: '出生日期的振動頻率。' },
+      attributes: [
+        { label: { en: 'Life Path', cn: '生命道路' }, value: lifePath },
+        { label: { en: 'Expression', cn: '表現數' }, value: lifePath } 
+      ],
+      details: { calculatedAt: new Date().toISOString() },
+      tags: [{ en: `Path ${lifePath}`, cn: `${lifePath}號人` }]
+    };
+  }
+
   static getBazi(user: UserProfile): MetaphysicalSystemData {
+    // 這裡未來可以加入節氣與干支計算庫
     return {
       id: `bazi-${user.id}`,
       type: 'BAZI',
@@ -79,21 +110,6 @@ export class MetaphysicalEngine {
     };
   }
 
-  static getNumerology(user: UserProfile): MetaphysicalSystemData {
-    return {
-      id: `num-${user.id}`,
-      type: 'NUMEROLOGY',
-      title: { en: 'Core Numerology', cn: '生命靈數' },
-      summary: { en: 'Vibrational frequency of birth date.', cn: '出生日期的振動頻率。' },
-      attributes: [
-        { label: { en: 'Life Path', cn: '生命道路' }, value: 7 },
-        { label: { en: 'Expression', cn: '表現數' }, value: 5 }
-      ],
-      details: {},
-      tags: []
-    };
-  }
-
   static get81LingDong(user: UserProfile): MetaphysicalSystemData {
     return {
       id: `81ld-${user.id}`,
@@ -110,7 +126,6 @@ export class MetaphysicalEngine {
   }
 
   static getRelationshipSynergy(u1: UserProfile, u2: UserProfile): RelationshipSynergy {
-    // Abstract data-driven synergy calculation
     const metrics: SynergyMetric[] = [
       {
         system: 'BAZI',
@@ -118,13 +133,6 @@ export class MetaphysicalEngine {
         score: 85,
         delta: 0.12,
         description: { en: 'High interaction density in Metal/Water phases.', cn: '金水相位交互密度高。' }
-      },
-      {
-        system: 'HUMAN_DESIGN',
-        label: { en: 'Center Definition', cn: '能量中心定義' },
-        score: 72,
-        delta: 0.45,
-        description: { en: 'Defined root connection with open head synergy.', cn: '根部中心定義與頭部中心協作。' }
       },
       {
         system: 'NUMEROLOGY',
