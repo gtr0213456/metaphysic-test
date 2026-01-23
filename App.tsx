@@ -1,21 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MetaphysicalEngine } from './services/metaphysicalEngine';
 
 function App() {
-  const [user, setUser] = useState({ 
-    name: "尋道者", 
-    birthday: "1995-06-15", 
-    id: "user-1" 
-  });
-  
+  const [user, setUser] = useState({ name: "尋道者", birthday: "1995-06-15", id: "user-1" });
   const [aiReading, setAiReading] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // 檢查組件是否正常掛載
-  useEffect(() => {
-    console.log("Aetheris OS 已啟動");
-  }, []);
 
   const handleGetAIReading = async () => {
     setIsLoading(true);
@@ -23,59 +12,55 @@ function App() {
       const result = await MetaphysicalEngine.getAIReading(user);
       setAiReading(result);
     } catch (error) {
-      console.error(error);
-      setAiReading("連線能量不穩定，請稍後再試。");
+      setAiReading("能量場不穩定，請重新召喚。");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (hasError) return <div style={{color: 'white', padding: '20px'}}>程式啟動失敗，請檢查控制台。</div>;
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans" style={{ backgroundColor: '#020617' }}>
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center text-purple-400">
-          Aetheris 玄學命理 OS
+    <div className="min-h-screen flex flex-col items-center justify-center p-6">
+      <div className="glass-card p-8 rounded-3xl w-full max-w-md animate-float">
+        <h1 className="text-2xl font-bold text-center mb-8 tracking-widest text-white">
+          AETHERIS OS
         </h1>
         
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl mb-8 shadow-xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-xs text-purple-400 mb-1 uppercase">姓名</label>
-              <input 
-                type="text" 
-                value={user.name}
-                onChange={(e) => setUser({...user, name: e.target.value})}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-purple-400 mb-1 uppercase">生日</label>
-              <input 
-                type="date" 
-                value={user.birthday}
-                onChange={(e) => setUser({...user, birthday: e.target.value})}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-slate-500 uppercase ml-1">Name</label>
+            <input 
+              type="text" 
+              value={user.name}
+              onChange={(e) => setUser({...user, name: e.target.value})}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 transition"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 uppercase ml-1">Birth Date</label>
+            <input 
+              type="date" 
+              value={user.birthday}
+              onChange={(e) => setUser({...user, birthday: e.target.value})}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 transition"
+            />
           </div>
 
           <button 
             onClick={handleGetAIReading}
             disabled={isLoading}
-            className="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 disabled:bg-slate-700 transition duration-300"
+            className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-purple-200 transition-all duration-300 mt-4 shadow-lg active:scale-95"
           >
-            {isLoading ? "🔮 大師冥想中..." : "獲取今日 AI 大師建議"}
+            {isLoading ? "🔮 正在讀取星象..." : "開始命理鑑定"}
           </button>
         </div>
 
         {aiReading && (
-          <div className="p-8 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-lg">
-            <h3 className="text-xl font-bold text-purple-100 mb-4 flex items-center gap-2">
-              <span>⚛️</span> Aetheris 導師洞察
-            </h3>
-            <p className="text-slate-200 italic font-light leading-relaxed">
+          <div className="mt-8 pt-8 border-t border-white/5">
+            <div className="flex items-center gap-2 mb-3 text-purple-400">
+              <i className="fa-solid fa-sparkles"></i>
+              <span className="text-sm font-semibold uppercase tracking-wider">導師指引</span>
+            </div>
+            <p className="text-slate-300 leading-relaxed italic">
               "{aiReading}"
             </p>
           </div>
