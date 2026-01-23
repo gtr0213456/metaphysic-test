@@ -1,73 +1,35 @@
 import React, { useState } from 'react';
-import { MetaphysicalEngine } from './services/metaphysicalEngine';
 
-function App() {
-  const [user, setUser] = useState({ name: "尋道者", birthday: "1995-06-15", id: "user-1" });
-  const [aiReading, setAiReading] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+export default function App() {
+  const [name, setName] = useState("尋道者");
+  const [result, setResult] = useState("");
 
-  const handleGetAIReading = async () => {
-    setIsLoading(true);
-    try {
-      const result = await MetaphysicalEngine.getAIReading(user);
-      setAiReading(result);
-    } catch (error) {
-      setAiReading("能量場不穩定，請重新召喚。");
-    } finally {
-      setIsLoading(false);
-    }
+  const testAI = () => {
+    setResult(`你好 ${name}，看到這個畫面代表你的網頁已經成功修復了！`);
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <div className="glass-card p-8 rounded-3xl w-full max-w-md animate-float">
-        <h1 className="text-2xl font-bold text-center mb-8 tracking-widest text-white">
-          AETHERIS OS
-        </h1>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-slate-500 uppercase ml-1">Name</label>
-            <input 
-              type="text" 
-              value={user.name}
-              onChange={(e) => setUser({...user, name: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 transition"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 uppercase ml-1">Birth Date</label>
-            <input 
-              type="date" 
-              value={user.birthday}
-              onChange={(e) => setUser({...user, birthday: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 transition"
-            />
-          </div>
-
-          <button 
-            onClick={handleGetAIReading}
-            disabled={isLoading}
-            className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-purple-200 transition-all duration-300 mt-4 shadow-lg active:scale-95"
-          >
-            {isLoading ? "🔮 正在讀取星象..." : "開始命理鑑定"}
-          </button>
-        </div>
-
-        {aiReading && (
-          <div className="mt-8 pt-8 border-t border-white/5">
-            <div className="flex items-center gap-2 mb-3 text-purple-400">
-              <i className="fa-solid fa-sparkles"></i>
-              <span className="text-sm font-semibold uppercase tracking-wider">導師指引</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed italic">
-              "{aiReading}"
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-sans p-4">
+      <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+        <h1 className="text-3xl font-bold mb-6 text-purple-400">Aetheris OS</h1>
+        <input 
+          type="text" 
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 mb-4 outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        <button 
+          onClick={testAI}
+          className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-bold transition"
+        >
+          測試系統能量
+        </button>
+        {result && (
+          <div className="mt-6 p-4 bg-slate-800 rounded-lg text-slate-300 italic">
+            {result}
           </div>
         )}
       </div>
     </div>
   );
 }
-
-export default App;
