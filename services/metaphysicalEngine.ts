@@ -8,21 +8,31 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 export class MetaphysicalEngine {
   
   /**
-   * 新增：AI 大師分析函式
+   * AI 大師分析函式 - 強化儀式感版本
    */
   static async getAIReading(user: UserProfile): Promise<string> {
     const bazi = this.getBazi(user);
     const num = this.getNumerology(user);
     const lingdong = this.get81LingDong(user);
 
-    // 建立給 AI 的指令 (Prompt)
+    // 建立更具儀式感的 Prompt
     const prompt = `
-      你是一位精通中西命理與現代能量分析的導師。請根據以下計算數據，為使用者提供一段約 150 字的專業分析與今日建議：
+      ## 角色設定
+      你是一位融合現代心理學與東方玄學的靈性導師「Aetheris」。
+      
+      ## 使用者玄學數據
       - 使用者姓名：${user.name}
+      - 姓名總格 (81靈動數)：${lingdong.attributes[0].value} (吉凶評級：${lingdong.attributes[1].value.cn})
       - 八字年柱：${bazi.details.pillars[0]}
       - 生命靈數：${num.attributes[0].value} 號人
-      - 姓名總格：${lingdong.attributes[0].value} (吉凶評級：${lingdong.attributes[1].value.cn})
-      請用繁體中文回答，語氣要知性、溫暖且富有啟發性。
+      
+      ## 任務要求
+      請根據以上數據提供一段「今日能量指引」：
+      1. 請先用一句話祝福使用者。
+      2. 針對其生命頻率與特質，給予約 120 字的溫暖建議與今日運勢解讀。
+      3. 結尾請明確給出一個「今日建議幸運物」。
+      
+      請使用繁體中文回答，語氣要優雅、專業且富有啟發性。
     `;
 
     try {
@@ -46,7 +56,7 @@ export class MetaphysicalEngine {
     ];
   }
 
-  // --- 以下保持你之前的計算工具邏輯 ---
+  // --- 核心計算工具 ---
 
   private static calculateLifePath(birthday: string): number {
     const digits = birthday.replace(/\D/g, '');
@@ -132,7 +142,6 @@ export class MetaphysicalEngine {
     };
   }
 
-  // 靜態資料保留
   static getHumanDesign(user: UserProfile): MetaphysicalSystemData { return { id: `hd-${user.id}`, type: 'HUMAN_DESIGN', title: { en: 'Human Design', cn: '人類圖' }, summary: { en: 'Blueprint.', cn: '能量藍圖' }, attributes: [], details: {}, tags: [] }; }
   static getAstrology(user: UserProfile): MetaphysicalSystemData { return { id: `astro-${user.id}`, type: 'ASTROLOGY', title: { en: 'Astrology', cn: '西洋占星' }, summary: { en: 'Planets.', cn: '星盤分析' }, attributes: [], details: {}, tags: [] }; }
   static getZiWei(user: UserProfile): MetaphysicalSystemData { return { id: `ziwei-${user.id}`, type: 'ZI_WEI', title: { en: 'Zi Wei', cn: '紫微斗數' }, summary: { en: 'Stars.', cn: '紫微命盤' }, attributes: [], details: {}, tags: [] }; }
