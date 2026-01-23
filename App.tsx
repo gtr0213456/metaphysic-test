@@ -17,8 +17,9 @@ export default function App() {
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      // 這是目前唯一正確且支援 1.5-flash 的路徑與型號組合
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // 【終極校正】改用 v1 穩定路徑，並使用相容性最高的 gemini-pro 型號
+      // 這個路徑在 Google 伺服器端擁有最高的優先權與穩定度
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -26,7 +27,7 @@ export default function App() {
         body: JSON.stringify({
           contents: [{ 
             parts: [{ 
-              text: `你是一位精通紫微斗數與占星的玄學大師。請為姓名：${user.name}，生日：${user.birthday} 的人鑑定今日運勢。語氣要神祕且溫暖，用繁體中文回答，約 100 字。` 
+              text: `你是一位玄學大師。請為姓名：${user.name}，生日：${user.birthday} 的人鑑定今日運勢。語氣神祕，用繁體中文回答，約 100 字。` 
             }] 
           }]
         })
@@ -34,71 +35,60 @@ export default function App() {
 
       const data = await response.json();
 
-      // 如果 API 回報錯誤，這裡會直接顯示具體訊息
+      // 如果 API 報錯，這裡會捕捉到
       if (data.error) {
-        throw new Error(`${data.error.message} (${data.error.status})`);
+        throw new Error(`${data.error.message} (代碼: ${data.error.code})`);
       }
 
       if (data.candidates && data.candidates[0].content) {
-        const result = data.candidates[0].content.parts[0].text;
-        setReading(result);
+        setReading(data.candidates[0].content.parts[0].text);
       } else {
-        throw new Error("模型感應失敗，請重試。");
+        throw new Error("模型無回應，請稍後再試。");
       }
     } catch (error: any) {
       console.error("AI 呼叫失敗:", error);
-      setReading(`天機混濁：${error.message}。請確認 API Key 並觀察 Console 報錯。`);
+      // 這裡會顯示最真實的錯誤原因
+      setReading(`連線失敗：${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 flex flex-col items-center font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 flex flex-col items-center">
       <div className="max-w-md w-full mt-12">
-        <h1 className="text-4xl font-black text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-300">
+        <h1 className="text-4xl font-black text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-300">
           Aetheris OS
         </h1>
-        <p className="text-center text-slate-500 text-sm mb-8 tracking-widest uppercase italic">玄學命理人工智慧系統</p>
 
-        <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl shadow-2xl backdrop-blur-xl">
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl">
           <div className="space-y-4">
-            <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">姓名 / Name</label>
-              <input 
-                type="text" 
-                placeholder="輸入您的姓名"
-                value={user.name}
-                onChange={(e) => setUser({...user, name: e.target.value})}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">出生日期 / Birthday</label>
-              <input 
-                type="date" 
-                value={user.birthday}
-                onChange={(e) => setUser({...user, birthday: e.target.value})}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 transition"
-              />
-            </div>
+            <input 
+              type="text" 
+              placeholder="您的姓名"
+              value={user.name}
+              onChange={(e) => setUser({...user, name: e.target.value})}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <input 
+              type="date" 
+              value={user.birthday}
+              onChange={(e) => setUser({...user, birthday: e.target.value})}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
+            />
             <button 
               onClick={getAIReading}
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg shadow-purple-900/20 active:scale-95 disabled:opacity-50"
+              className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl transition active:scale-95 disabled:opacity-50"
             >
-              {isLoading ? "🔮 正在召喚星象能量..." : "獲取 AI 大師鑑定"}
+              {isLoading ? "🔮 正在召喚能量..." : "獲取大師鑑定"}
             </button>
           </div>
         </div>
 
         {reading && (
-          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-[0_0_30px_rgba(139,92,246,0.15)]">
-            <div className="flex items-center gap-2 mb-4 text-purple-300">
-              <span className="text-xl">⚛️</span>
-              <h3 className="font-bold tracking-wider uppercase text-sm">大師洞察分析</h3>
-            </div>
-            <p className="text-slate-200 leading-relaxed text-lg italic font-light">
+          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30">
+            <p className="text-slate-200 leading-relaxed italic">
               "{reading}"
             </p>
           </div>
