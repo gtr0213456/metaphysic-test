@@ -12,15 +12,15 @@ export default function App() {
     }
 
     setIsLoading(true);
-    setReading(""); // 清除舊的結果
+    setReading(""); 
     
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      // 使用更穩定的 v1 版本與正確的型號代碼
+      // 校準為最穩定的 v1beta 與最新的 Flash 模型名稱
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-      const prompt = `你是一位精通紫微斗數與西洋占星的玄學大師。請為姓名：${user.name}，生日：${user.birthday} 的使用者進行今日運勢鑑定。請用繁體中文回答，語氣神祕且溫暖，約 100 字。`;
+      const prompt = `你是一位精通紫微斗數與西洋占星的玄學大師。現在有一位使用者，姓名：${user.name}，生日：${user.birthday}。請為他進行今日運勢鑑定，語氣要神祕、專業且溫暖。請用繁體中文回答，約 100 字。`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -32,15 +32,26 @@ export default function App() {
 
       const data = await response.json();
 
+      // 詳細捕捉來自 Google 的錯誤訊息
       if (data.error) {
-        throw new Error(data.error.message);
+        console.error("Google API Error:", data.error);
+        throw new Error(data.error.message || "API 連線失敗");
+      }
+
+      if (!data.candidates || data.candidates.length === 0) {
+        throw new Error("模型未回傳結果");
       }
 
       const result = data.candidates[0].content.parts[0].text;
       setReading(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI 呼叫失敗:", error);
-      setReading("天機混濁，連線能量不穩定。請檢查 API Key 是否正確，或稍後再試。");
+      // 如果是 API Key 沒讀到，給予更具體的提示
+      if (error.message.includes("API key not valid")) {
+        setReading("金鑰無效。請確認 Vercel 的環境變數設定正確，並已重新部署。");
+      } else {
+        setReading(`天機混濁：${error.message || "能量不穩定"}。請確認 API Key 並重新部署。`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +68,7 @@ export default function App() {
         <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl shadow-2xl backdrop-blur-xl">
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">姓名 / Name</label>
+              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase tracking-tighter">姓名 / Name</label>
               <input 
                 type="text" 
                 placeholder="輸入您的姓名"
@@ -67,7 +78,7 @@ export default function App() {
               />
             </div>
             <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">出生日期 / Birthday</label>
+              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase tracking-tighter">出生日期 / Birthday</label>
               <input 
                 type="date" 
                 value={user.birthday}
@@ -80,13 +91,13 @@ export default function App() {
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg shadow-purple-900/20 active:scale-95 disabled:opacity-50"
             >
-              {isLoading ? "🔮 正在召喚星象能量..." : "獲取 AI 大師鑑定"}
+              {isLoading ? "🔮 正在召喚星象能量..." : "獲役 AI 大師鑑定"}
             </button>
           </div>
         </div>
 
         {reading && (
-          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-[0_0_30px_rgba(139,92,246,0.15)]">
+          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-[0_0_30px_rgba(139,92,246,0.15)] animate-in fade-in zoom-in duration-500">
             <div className="flex items-center gap-2 mb-4 text-purple-300">
               <span className="text-xl">⚛️</span>
               <h3 className="font-bold tracking-wider uppercase text-sm">大師洞察分析</h3>
@@ -94,6 +105,9 @@ export default function App() {
             <p className="text-slate-200 leading-relaxed text-lg italic font-light">
               "{reading}"
             </p>
+            <div className="mt-6 pt-4 border-t border-slate-800 text-[10px] text-slate-600 text-right uppercase tracking-[0.2em]">
+              Energy Synced ● Aetheris OS Core
+            </div>
           </div>
         )}
       </div>
