@@ -17,10 +17,10 @@ export default function App() {
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      // 改用最新的 Flash 模型標籤與 v1beta 介面
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      // 【核心修正】改用 v1 版本，並使用絕對不會錯的模型標識符
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
 
-      const prompt = `你是一位精通紫微斗數與西洋占星的玄學大師。現在有一位使用者，姓名：${user.name}，生日：${user.birthday}。請為他進行今日運勢鑑定，語氣要神祕、專業且溫暖。請用繁體中文回答，約 100 字。`;
+      const prompt = `你是一位玄學大師。姓名：${user.name}，生日：${user.birthday}。請為他進行今日運勢鑑定。請用繁體中文回答，約 100 字。`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -33,18 +33,18 @@ export default function App() {
       const data = await response.json();
 
       if (data.error) {
+        // 如果 gemini-pro 也不行（極少見），這裡會抓到原因
         throw new Error(data.error.message);
       }
 
       if (data.candidates && data.candidates[0].content) {
-        const result = data.candidates[0].content.parts[0].text;
-        setReading(result);
+        setReading(data.candidates[0].content.parts[0].text);
       } else {
-        throw new Error("模型感應失敗，請重試。");
+        throw new Error("模型未感應到訊息，請重試。");
       }
     } catch (error: any) {
       console.error("AI 呼叫失敗:", error);
-      setReading(`天機混濁：${error.message || "連線不穩定"}。請確認 API Key 並重新部署。`);
+      setReading(`天機不可洩漏（錯誤：${error.message}）。請確認 Vercel 環境變數已點擊 Redeploy 且 Key 正確。`);
     } finally {
       setIsLoading(false);
     }
@@ -56,48 +56,42 @@ export default function App() {
         <h1 className="text-4xl font-black text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-300">
           Aetheris OS
         </h1>
-        <p className="text-center text-slate-500 text-sm mb-8 tracking-widest uppercase italic">玄學命理人工智慧系統</p>
+        <p className="text-center text-slate-500 text-sm mb-8 tracking-widest uppercase italic font-bold">玄學命理人工智慧系統</p>
 
         <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl shadow-2xl backdrop-blur-xl">
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">姓名 / Name</label>
+              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold">姓名 / Name</label>
               <input 
                 type="text" 
-                placeholder="輸入您的姓名"
                 value={user.name}
                 onChange={(e) => setUser({...user, name: e.target.value})}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 transition"
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold uppercase">出生日期 / Birthday</label>
+              <label className="block text-xs text-purple-400 mb-1 ml-1 font-bold">出生日期 / Birthday</label>
               <input 
                 type="date" 
                 value={user.birthday}
                 onChange={(e) => setUser({...user, birthday: e.target.value})}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500 transition"
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
             <button 
               onClick={getAIReading}
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg shadow-purple-900/20 active:scale-95 disabled:opacity-50"
+              className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl transition active:scale-95 disabled:opacity-50"
             >
-              {isLoading ? "🔮 正在召喚星象能量..." : "獲取 AI 大師鑑定"}
+              {isLoading ? "🔮 正在讀取天象..." : "獲取大師鑑定"}
             </button>
           </div>
         </div>
 
         {reading && (
-          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-[0_0_30px_rgba(139,92,246,0.15)]">
-            <div className="flex items-center gap-2 mb-4 text-purple-300">
-              <span className="text-xl">⚛️</span>
-              <h3 className="font-bold tracking-wider uppercase text-sm">大師洞察分析</h3>
-            </div>
-            <p className="text-slate-200 leading-relaxed text-lg italic font-light">
-              "{reading}"
-            </p>
+          <div className="mt-8 p-8 rounded-3xl bg-slate-900 border border-purple-500/30">
+            <h3 className="text-purple-300 font-bold mb-2">大師鑑定結果：</h3>
+            <p className="text-slate-200 italic">"{reading}"</p>
           </div>
         )}
       </div>
