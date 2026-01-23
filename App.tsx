@@ -18,7 +18,7 @@ export default function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       // 使用更穩定的 v1 版本與正確的型號代碼
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
       const prompt = `你是一位精通紫微斗數與西洋占星的玄學大師。請為姓名：${user.name}，生日：${user.birthday} 的使用者進行今日運勢鑑定。請用繁體中文回答，語氣神祕且溫暖，約 100 字。`;
 
