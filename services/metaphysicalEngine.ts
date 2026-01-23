@@ -26,14 +26,64 @@ export class MetaphysicalEngine {
   }
 
   private static calculateStrokes(name: string): number {
-    // 真正的筆劃計算通常需要後端 API 或大型字典檔
-    // 這裡我們先用字串長度與字元編碼模擬一個穩定的計算邏輯
     if (!name) return 0;
     const base = name.split('').reduce((acc, char) => acc + (char.charCodeAt(0) % 10), 0);
-    return (base % 81) || 81; // 確保在 1-81 之間
+    return (base % 81) || 81;
+  }
+
+  private static calculateBaziLogic(birthday: string) {
+    const date = new Date(birthday || '1990-01-01');
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+
+    // 簡化干支計算 (以 1900 庚子年為基準)
+    const stems = ['庚', '辛', '壬', '癸', '甲', '乙', '丙', '丁', '戊', '己'];
+    const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    
+    const yearStem = stems[(year - 1900) % 10];
+    const yearBranch = branches[(year - 1900) % 12];
+
+    // 五行權重初始化
+    let weights = { Wood: 20, Fire: 20, Earth: 20, Metal: 20, Water: 20 };
+
+    // 依月份調整旺相 (簡化邏輯)
+    if ([3, 4, 5].includes(month)) weights.Wood += 30; // 春木旺
+    else if ([6, 7, 8].includes(month)) weights.Fire += 30; // 夏火旺
+    else if ([9, 10, 11].includes(month)) weights.Metal += 30; // 秋金旺
+    else weights.Water += 30; // 冬水旺
+
+    return {
+      pillar: `${yearStem}${yearBranch}`,
+      weights: Object.entries(weights).map(([key, val]) => ({
+        label: key,
+        value: val,
+        intensity: val / 100
+      }))
+    };
   }
 
   // --- 各系統實作 ---
+
+  static getBazi(user: UserProfile): MetaphysicalSystemData {
+    const bazi = this.calculateBaziLogic(user.birthday);
+    const elementNames: Record<string, string> = { 
+      Wood: '木', Fire: '火', Earth: '土', Metal: '金', Water: '水' 
+    };
+
+    return {
+      id: `bazi-${user.id}`,
+      type: 'BAZI',
+      title: { en: 'Bazi (Four Pillars)', cn: '八字命盤' },
+      summary: { en: 'Analysis of innate elemental balance.', cn: '先天五行結構分析。' },
+      attributes: bazi.weights.map(w => ({
+        label: { en: w.label, cn: elementNames[w.label] },
+        value: w.value,
+        intensity: w.intensity
+      })),
+      details: { pillars: [bazi.pillar, '??', '??', '??'] },
+      tags: [{ en: 'Dynamic Analysis', cn: '動態分析中' }]
+    };
+  }
 
   static getNumerology(user: UserProfile): MetaphysicalSystemData {
     const lifePath = this.calculateLifePath(user.birthday || '2000-01-01');
@@ -53,9 +103,7 @@ export class MetaphysicalEngine {
 
   static get81LingDong(user: UserProfile): MetaphysicalSystemData {
     const totalStrokes = this.calculateStrokes(user.name);
-    // 簡單判斷吉凶 (示範用)
     const isLucky = [1, 3, 5, 7, 8, 11, 13, 15, 16, 18, 21, 23, 24, 25, 31, 32, 33, 35, 37, 39, 41, 45, 47, 48, 52, 57, 61, 63, 65, 67, 68, 81].includes(totalStrokes);
-
     return {
       id: `81ld-${user.id}`,
       type: 'LING_DONG_81',
@@ -70,59 +118,65 @@ export class MetaphysicalEngine {
     };
   }
 
-  static getBazi(user: UserProfile): MetaphysicalSystemData {
-    // 這裡目前仍為模擬數據，八字需要複雜的萬年曆轉換邏輯
+  // 暫時保持靜態，待未來實作
+  static getHumanDesign(user: UserProfile): MetaphysicalSystemData {
     return {
-      id: `bazi-${user.id}`,
-      type: 'BAZI',
-      title: { en: 'Bazi (Four Pillars)', cn: '八字命盤' },
-      summary: { en: 'Structural analysis of innate elemental balance.', cn: '先天五行結構分析。' },
+      id: `hd-${user.id}`,
+      type: 'HUMAN_DESIGN',
+      title: { en: 'Human Design', cn: '人類圖' },
+      summary: { en: 'Mechanical energetic blueprint.', cn: '能量運作機制藍圖。' },
       attributes: [
-        { label: { en: 'Wood', cn: '木' }, value: 20, intensity: 0.2 },
-        { label: { en: 'Fire', cn: '火' }, value: 45, intensity: 0.45 },
-        { label: { en: 'Earth', cn: '土' }, value: 15, intensity: 0.15 },
-        { label: { en: 'Metal', cn: '金' }, value: 80, intensity: 0.8 },
-        { label: { en: 'Water', cn: '水' }, value: 30, intensity: 0.3 }
+        { label: { en: 'Type', cn: '類型' }, value: { en: 'Projector', cn: '投射者' } },
+        { label: { en: 'Profile', cn: '角色' }, value: { en: '1/3', cn: '1/3' } }
       ],
-      details: { pillars: ['壬申', '戊申', '癸酉', '丁巳'] },
-      tags: [{ en: 'Metal Strong', cn: '金旺' }]
+      details: {},
+      tags: [{ en: 'Strategy: Invite', cn: '策略：等待邀請' }]
     };
   }
 
-  // ... (其他 getHumanDesign, getAstrology, getZiWei 保持原狀) ...
+  static getAstrology(user: UserProfile): MetaphysicalSystemData {
+    return {
+      id: `astro-${user.id}`,
+      type: 'ASTROLOGY',
+      title: { en: 'Western Astrology', cn: '西洋占星' },
+      summary: { en: 'Geocentric planetary coordinates.', cn: '地球中心行星座標分析。' },
+      attributes: [{ label: { en: 'Sun', cn: '太陽' }, value: { en: 'Analyzing', cn: '分析中' } }],
+      details: {},
+      tags: []
+    };
+  }
+
+  static getZiWei(user: UserProfile): MetaphysicalSystemData {
+    return {
+      id: `ziwei-${user.id}`,
+      type: 'ZI_WEI',
+      title: { en: 'Zi Wei Dou Shu', cn: '紫微斗數' },
+      summary: { en: 'Stellar coordinates and palace distribution.', cn: '星曜座標與宮位分佈。' },
+      attributes: [{ label: { en: 'Main Palace', cn: '命宮' }, value: { en: 'Calculating', cn: '計算中' } }],
+      details: {},
+      tags: []
+    };
+  }
 
   static getRelationshipSynergy(u1: UserProfile, u2: UserProfile): RelationshipSynergy {
     const p1 = this.calculateLifePath(u1.birthday);
     const p2 = this.calculateLifePath(u2.birthday);
-    
-    // 簡單的共振演算法：如果數字相同或相近，分數較高
     const diff = Math.abs(p1 - p2);
     const numScore = 100 - (diff * 10);
 
-    const metrics: SynergyMetric[] = [
-      {
-        system: 'NUMEROLOGY',
-        label: { en: 'Frequency Sync', cn: '頻率同步' },
-        score: numScore,
-        delta: diff / 10,
-        description: { en: `Resonance between Path ${p1} and Path ${p2}.`, cn: `${p1}號人與${p2}號人的頻率共振。` }
-      },
-      {
-        system: 'BAZI',
-        label: { en: 'Elemental Balance', cn: '五行平衡' },
-        score: 85,
-        delta: 0.12,
-        description: { en: 'High interaction density in Metal/Water phases.', cn: '金水相位交互密度高。' }
-      }
-    ];
-
     return {
-      overallScore: Math.round((numScore + 85) / 2),
-      metrics,
+      overallScore: Math.round(numScore),
+      metrics: [
+        {
+          system: 'NUMEROLOGY',
+          label: { en: 'Frequency Sync', cn: '頻率同步' },
+          score: numScore,
+          delta: diff / 10,
+          description: { en: `Resonance between Path ${p1} and ${p2}.`, cn: `${p1}號人與${p2}號人的共振。` }
+        }
+      ],
       dynamicFactors: [
-        { type: { en: 'Tension', cn: '張力' }, value: 20 + (diff * 5) },
-        { type: { en: 'Support', cn: '支撐' }, value: 80 - (diff * 2) },
-        { type: { en: 'Growth', cn: '成長' }, value: 60 }
+        { type: { en: 'Support', cn: '支撐' }, value: 80 - (diff * 2) }
       ]
     };
   }
