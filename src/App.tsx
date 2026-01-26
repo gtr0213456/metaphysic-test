@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// --- 元件：鑑定數值卡片 ---
+// --- 小型元件：鑑定卡片 ---
 function MiniCard({ title, value, icon }: { title: string; value: string; icon: string }) {
   return (
     <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem] hover:bg-white/10 transition-all duration-500 group">
@@ -20,73 +20,82 @@ export default function App() {
 
   const fetchAnalysis = async () => {
     if (!user.name || !user.birthday) return alert("請填寫姓名與生日");
+    
+    // --- 1. 環境變數檢查機制 ---
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === "undefined") {
+      alert("❌ 錯誤：程式讀取不到 API Key。\n請確認 Vercel 變數名稱為 VITE_GEMINI_API_KEY (全大寫) 並已執行 Redeploy。");
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key 尚未注入。請在 Vercel 設定 VITE_GEMINI_API_KEY 並點擊 Redeploy。");
-      }
-
       const isRel = mode === 'relationship';
       const prompt = `你是一位精通玄學能量的大師。請針對以下主體進行鑑定：
       主體：${user.name} (${user.birthday}) ${isRel ? `與對象：${partner.name} (${partner.birthday})` : ''}。
-      請產出 JSON 格式，不得包含 Markdown 標籤：
+      請直接產出 JSON 格式數據，不得包含 Markdown 標籤：
       {
-        "personal": { "bazi": "格局", "lifeNum": "命數", "tzolkin": "馬雅", "humanDesign": "類型", "name81": "吉凶" },
-        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
-        "dailyAdvice": "指引"
+        "personal": { "bazi": "格局簡述", "lifeNum": "主命數", "tzolkin": "馬雅 KIN", "humanDesign": "類型", "name81": "姓名吉凶" },
+        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振描述", "advice": "建議" },` : ''}
+        "dailyAdvice": "今日能量引導"
       }`;
 
-      // --- 自動降級機制：解決 image_f3855b 的 404 問題 ---
-      // 依序嘗試：v1 穩定版 -> v1beta 測試版 -> 備用 Pro 模型
+      // --- 2. 自動降級路徑組合 (解決 404 問題) ---
       const endpoints = [
         `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`
       ];
 
-      let finalRes = null;
-      let lastErr = "";
+      let successData = null;
+      let lastErrorMessage = "";
 
       for (const url of endpoints) {
         try {
+          console.log(`嘗試連線路徑: ${url.split('?')[0]}`);
           const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
           });
+
           const res = await response.json();
           if (!res.error && res.candidates) {
-            finalRes = res;
-            break; // 成功即跳出
+            successData = res;
+            break; 
           } else {
-            lastErr = res.error?.message || "節點無回應";
+            lastErrorMessage = res.error?.message || "節點無回應";
           }
-        } catch (e) { lastErr = "連線失敗"; }
+        } catch (e) {
+          lastErrorMessage = "網路連線異常";
+        }
       }
 
-      if (!finalRes) throw new Error(`所有宇宙路徑均失效: ${lastErr}`);
+      if (!successData) {
+        throw new Error(`所有連線路徑均失效。最後錯誤：${lastErrorMessage}`);
+      }
 
-      let raw = finalRes.candidates[0].content.parts[0].text;
+      // --- 3. 數據解析 ---
+      let raw = successData.candidates[0].content.parts[0].text;
       raw = raw.replace(/```json|```|json|`/gi, "").trim();
       setData(JSON.parse(raw));
 
     } catch (e: any) {
-      alert("能量讀取異常: " + e.message);
+      console.error("Analysis Error:", e);
+      alert("連線異常: " + e.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans">
+    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
       <header className="pt-16 pb-10 text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-3 font-bold opacity-60">Metaphysical Life OS</p>
       </header>
 
-      {/* 模式切換器 [對應 image_f4697f, image_f4695c] */}
       <div className="flex justify-center gap-4 mb-10">
         <button onClick={() => { setMode('personal'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}>個人鑑定</button>
         <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}>雙人共振</button>
@@ -108,7 +117,7 @@ export default function App() {
             </div>
           )}
 
-          <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.4em] text-xs transition-all active:scale-95 ${mode === 'personal' ? 'bg-indigo-600' : 'bg-pink-600'} shadow-2xl disabled:opacity-30`}>
+          <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.4em] text-xs transition-all active:scale-95 ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} shadow-2xl disabled:opacity-30`}>
             {isLoading ? "CALCULATING..." : "INITIATE ANALYSIS"}
           </button>
         </div>
@@ -144,7 +153,7 @@ export default function App() {
               <MiniCard title="姓名鑑定" value={data.personal.name81} icon="✨" />
             </div>
 
-            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] text-center shadow-inner">
+            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] text-center">
               <p className="text-[10px] font-bold tracking-[0.4em] text-indigo-400 mb-5 uppercase">Oracle Guidance</p>
               <p className="text-lg font-light leading-relaxed text-slate-300 italic">「 {data.dailyAdvice} 」</p>
             </div>
