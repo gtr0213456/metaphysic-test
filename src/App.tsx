@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// --- 小型元件：鑑定卡片 ---
+// --- 元件：鑑定數值卡片 ---
 function MiniCard({ title, value, icon }: { title: string; value: string; icon: string }) {
   return (
     <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem] hover:bg-white/10 transition-all duration-500 group">
@@ -23,106 +23,76 @@ export default function App() {
     setIsLoading(true);
     
     try {
-      // 1. 讀取環境變數
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      
       if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key 讀取失敗。請確認 Vercel 設定中有名稱為 VITE_GEMINI_API_KEY 的變數，並已重新部署 (Redeploy)。");
+        throw new Error("API Key 尚未注入。請在 Vercel 設定 VITE_GEMINI_API_KEY 並點擊 Redeploy。");
       }
 
       const isRel = mode === 'relationship';
-      const prompt = `你是一位精通全球玄學與能量系統的大師。
-      主體：${user.name} (${user.birthday}) ${isRel ? `與 對象：${partner.name} (${partner.birthday})` : ''}。
-      請直接產出 JSON 格式數據，不得有任何 Markdown 或多餘解釋：
+      const prompt = `你是一位精通玄學能量的大師。請針對以下主體進行鑑定：
+      主體：${user.name} (${user.birthday}) ${isRel ? `與對象：${partner.name} (${partner.birthday})` : ''}。
+      請產出 JSON 格式，不得包含 Markdown 標籤：
       {
-        "personal": {
-          "bazi": "格局簡述",
-          "lifeNum": "主命數",
-          "tzolkin": "馬雅 KIN/圖騰",
-          "humanDesign": "類型/權威",
-          "name81": "吉凶"
-        },
-        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振描述", "advice": "建議" },` : ''}
-        "dailyAdvice": "今日能量指引"
+        "personal": { "bazi": "格局", "lifeNum": "命數", "tzolkin": "馬雅", "humanDesign": "類型", "name81": "吉凶" },
+        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
+        "dailyAdvice": "指引"
       }`;
 
-      // --- 核心修復：自動降級機制 [針對 404 Model Not Found 進行覆盤] ---
-      // 我們定義多個可能的 API 路徑組合，程式會依序嘗試直至成功
-      const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, // 穩定版 v1
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, // 測試版最新
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}` // 降級至 Pro 版本
+      // --- 自動降級機制：解決 image_f3855b 的 404 問題 ---
+      // 依序嘗試：v1 穩定版 -> v1beta 測試版 -> 備用 Pro 模型
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`
       ];
 
-      let successResponse = null;
-      let lastErrorMessage = "";
+      let finalRes = null;
+      let lastErr = "";
 
-      for (const url of apiEndpoints) {
+      for (const url of endpoints) {
         try {
-          console.log(`正在嘗試宇宙頻率連結... 路徑: ${url.split('?')[0]}`);
           const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
           });
-
-          const result = await response.json();
-          
-          if (!result.error && result.candidates) {
-            successResponse = result;
-            break; // 成功連結，跳出迴圈
+          const res = await response.json();
+          if (!res.error && res.candidates) {
+            finalRes = res;
+            break; // 成功即跳出
           } else {
-            lastErrorMessage = result.error?.message || "未知的 API 回應錯誤";
-            console.warn(`節點失效: ${lastErrorMessage}`);
+            lastErr = res.error?.message || "節點無回應";
           }
-        } catch (e) {
-          lastErrorMessage = "網路連線異常";
-        }
+        } catch (e) { lastErr = "連線失敗"; }
       }
 
-      if (!successResponse) {
-        throw new Error(`所有宇宙節點均連線失敗。最後錯誤訊息：${lastErrorMessage}`);
-      }
+      if (!finalRes) throw new Error(`所有宇宙路徑均失效: ${lastErr}`);
 
-      // 2. 解析 JSON 數據
-      let raw = successResponse.candidates[0].content.parts[0].text;
+      let raw = finalRes.candidates[0].content.parts[0].text;
       raw = raw.replace(/```json|```|json|`/gi, "").trim();
       setData(JSON.parse(raw));
 
     } catch (e: any) {
-      console.error("能量解碼異常:", e);
-      alert(e.message);
+      alert("能量讀取異常: " + e.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
-      {/* 標題與視覺區 */}
+    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans">
       <header className="pt-16 pb-10 text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-3 font-bold opacity-60">Metaphysical Life OS</p>
       </header>
 
-      {/* 模式切換器 */}
+      {/* 模式切換器 [對應 image_f4697f, image_f4695c] */}
       <div className="flex justify-center gap-4 mb-10">
-        <button 
-          onClick={() => { setMode('personal'); setData(null); }} 
-          className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}
-        >
-          個人鑑定
-        </button>
-        <button 
-          onClick={() => { setMode('relationship'); setData(null); }} 
-          className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}
-        >
-          雙人共振
-        </button>
+        <button onClick={() => { setMode('personal'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}>個人鑑定</button>
+        <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}>雙人共振</button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-10">
-        {/* 輸入介面 */}
         <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-3xl shadow-2xl space-y-6">
           <div className="space-y-4">
             <p className="text-[9px] font-bold text-indigo-400/60 tracking-widest uppercase ml-1">Alpha Subject</p>
@@ -138,12 +108,11 @@ export default function App() {
             </div>
           )}
 
-          <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.4em] text-xs transition-all active:scale-95 ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} shadow-2xl disabled:opacity-30`}>
+          <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.4em] text-xs transition-all active:scale-95 ${mode === 'personal' ? 'bg-indigo-600' : 'bg-pink-600'} shadow-2xl disabled:opacity-30`}>
             {isLoading ? "CALCULATING..." : "INITIATE ANALYSIS"}
           </button>
         </div>
 
-        {/* 結果展示 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
             <div className="bg-gradient-to-b from-indigo-500/20 to-transparent border border-white/10 rounded-[3rem] p-10 text-center">
