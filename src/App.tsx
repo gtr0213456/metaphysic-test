@@ -8,19 +8,19 @@ export default function App() {
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
   const fetchAnalysis = async () => {
-    if (!user.name || !user.birthday) return alert("請填寫姓名與生日");
+    if (!user.name || !user.birthday) return alert("請完整輸入姓名與生日");
     setIsLoading(true);
     
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey || apiKey === "undefined") {
-        throw new Error("API Key 未載入，請檢查 Vercel 設定");
+        throw new Error("API Key 未設定，請檢查 Vercel 環境變數");
       }
 
       const isRel = mode === 'relationship';
       const prompt = `你是一位精通全球玄學與能量系統的大師。
       主體：${user.name} (${user.birthday}) ${isRel ? `與 對象：${partner.name} (${partner.birthday})` : ''}。
-      請直接產出 JSON 格式數據，不得有其他文字：
+      請直接產出 JSON 格式數據，不得有其他文字或 Markdown 標記：
       {
         "personal": {
           "bazi": "格局名稱",
@@ -29,12 +29,12 @@ export default function App() {
           "humanDesign": "類型/權威",
           "name81": "總格吉凶"
         },
-        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
-        "dailyAdvice": "今日能量引導語"
+        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振描述", "advice": "建議" },` : ''}
+        "dailyAdvice": "今日能量指引"
       }`;
 
-      // 修正後的 URL：使用 v1 版本 [對應 image_f44ff0 錯誤]
-      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // 使用經測試最穩定的 v1beta 端點 [針對 image_f3ee75 報錯修正]
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -49,43 +49,44 @@ export default function App() {
       }
 
       let raw = res.candidates[0].content.parts[0].text;
+      // 強制過濾所有 Markdown 格式代碼塊
       raw = raw.replace(/```json|```|json|`/gi, "").trim();
       
       setData(JSON.parse(raw));
     } catch (e: any) {
       console.error("能量解碼異常:", e);
-      alert("連線異常: " + (e.message || "未知錯誤"));
+      alert("連線異常: " + (e.message || "未知干擾"));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans">
+    <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
       <header className="pt-12 pb-6 text-center">
         <h1 className="text-3xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-2 font-bold">Metaphysical Life OS</p>
       </header>
 
       <div className="flex justify-center gap-3 mb-8">
-        <button onClick={() => { setMode('personal'); setData(null); }} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-white/5 text-slate-500'}`}>個人命盤</button>
-        <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_0_20px_rgba(219,39,119,0.4)]' : 'bg-white/5 text-slate-500'}`}>情侶同步</button>
+        <button onClick={() => { setMode('personal'); setData(null); }} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>個人命盤</button>
+        <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-[0_0_20px_rgba(219,39,119,0.4)]' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>情侶同步</button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-8">
-        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-2xl space-y-5">
-          <input type="text" placeholder="您的姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 outline-none" />
+        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-2xl shadow-2xl space-y-5">
+          <input type="text" placeholder="SUBJECT NAME" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 outline-none" />
           <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 outline-none" />
           
           {mode === 'relationship' && (
             <div className="pt-5 border-t border-white/5 space-y-4 animate-in fade-in duration-700">
-              <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 outline-none" />
+              <input type="text" placeholder="PARTNER NAME" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 outline-none" />
               <input type="date" value={partner.birthday} onChange={(e)=>setPartner({...partner, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 outline-none" />
             </div>
           )}
 
           <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.3em] text-xs transition-all ${mode === 'personal' ? 'bg-indigo-600' : 'bg-pink-600'} disabled:opacity-50`}>
-            {isLoading ? "ALIGNING..." : "INITIATE ANALYSIS"}
+            {isLoading ? "CALCULATING..." : "INITIATE ANALYSIS"}
           </button>
         </div>
 
@@ -124,7 +125,7 @@ export default function App() {
 
             <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem]">
               <p className="text-[10px] font-bold tracking-[0.4em] text-indigo-400 mb-4 uppercase text-center">Aetheris Guidance</p>
-              <p className="text-base font-light leading-relaxed text-slate-300 italic text-center">「 {data.dailyAdvice} 」</p>
+              <p className="text-base font-light leading-relaxed text-slate-300 italic text-center text-balance leading-relaxed">「 {data.dailyAdvice} 」</p>
             </div>
           </div>
         )}
@@ -135,7 +136,7 @@ export default function App() {
 
 function MiniCard({ title, value, icon }: any) {
   return (
-    <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem]">
+    <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem] hover:bg-white/10 transition-colors">
       <div className="text-xl mb-3 opacity-50">{icon}</div>
       <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1 text-center">{title}</p>
       <p className="text-sm font-bold text-slate-200 text-center">{value}</p>
