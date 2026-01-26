@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// --- 元件：鑑定數值小卡 ---
+// --- 小型元件：鑑定卡片 ---
 function MiniCard({ title, value, icon }: { title: string; value: string; icon: string }) {
   return (
     <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem] hover:bg-white/10 transition-all duration-500 group">
@@ -23,15 +23,17 @@ export default function App() {
     setIsLoading(true);
     
     try {
+      // 這裡對應你在 Vercel 設定的 Key 名稱
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey || apiKey === "undefined" || apiKey.length < 10) {
-        throw new Error("API Key 格式異常或未讀取，請檢查 Vercel 設定");
+      
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("API Key 未正確載入。請確保 Vercel 的 Environment Variable 名稱為 VITE_GEMINI_API_KEY");
       }
 
       const isRel = mode === 'relationship';
       const prompt = `你是一位精通全球玄學與能量系統的大師。
       主體：${user.name} (${user.birthday}) ${isRel ? `與 對象：${partner.name} (${partner.birthday})` : ''}。
-      請產出 JSON 格式數據，不得有 Markdown 標籤或解釋：
+      請產出 JSON 格式數據，不得有 Markdown 標籤：
       {
         "personal": {
           "bazi": "格局簡述",
@@ -40,39 +42,32 @@ export default function App() {
           "humanDesign": "類型/權威",
           "name81": "吉凶"
         },
-        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
+        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振描述", "advice": "建議" },` : ''}
         "dailyAdvice": "今日能量引導"
       }`;
 
-      // 雙保險模型端點 [修正 404 Model Not Found]
-      const modelEndpoints = ['gemini-1.5-flash', 'gemini-1.5-flash-latest'];
-      let finalResponse = null;
+      // 使用最相容的模型路徑 [解決 image_f3855b 的 404 問題]
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
-      for (const model of modelEndpoints) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          });
-          const res = await response.json();
-          if (!res.error) {
-            finalResponse = res;
-            break; 
-          }
-        } catch (e) { continue; }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+
+      const res = await response.json();
+      
+      if (res.error) {
+        throw new Error(`Google API 錯誤: ${res.error.message}`);
       }
 
-      if (!finalResponse) throw new Error("宇宙連線失敗，請檢查 API Key 權限或稍後再試");
-
-      let raw = finalResponse.candidates[0].content.parts[0].text;
+      let raw = res.candidates[0].content.parts[0].text;
       raw = raw.replace(/```json|```|json|`/gi, "").trim();
       setData(JSON.parse(raw));
 
     } catch (e: any) {
-      console.error("能量解碼異常:", e);
-      alert(e.message);
+      console.error("解碼失敗:", e);
+      alert("連線異常: " + e.message);
     } finally {
       setIsLoading(false);
     }
@@ -80,17 +75,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
+      {/* 標題區 */}
       <header className="pt-16 pb-10 text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-3 font-bold opacity-60">Metaphysical Life OS</p>
       </header>
 
+      {/* 切換按鈕 */}
       <div className="flex justify-center gap-4 mb-10">
         <button onClick={() => { setMode('personal'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}>個人鑑定</button>
         <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}>雙人共振</button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-10">
+        {/* 輸入區卡片 [對應 image_f4697f] */}
         <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-3xl shadow-2xl space-y-6">
           <div className="space-y-4">
             <p className="text-[9px] font-bold text-indigo-400/60 tracking-widest uppercase ml-1">Alpha Subject</p>
@@ -111,6 +109,7 @@ export default function App() {
           </button>
         </div>
 
+        {/* 結果展示區 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
             <div className="bg-gradient-to-b from-indigo-500/20 to-transparent border border-white/10 rounded-[3rem] p-10 text-center">
