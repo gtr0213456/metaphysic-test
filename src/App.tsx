@@ -8,27 +8,33 @@ export default function App() {
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
   const fetchAnalysis = async () => {
-    if (!user.name || !user.birthday) return alert("請填寫完整資訊");
+    if (!user.name || !user.birthday) return alert("請填寫姓名與生日");
     setIsLoading(true);
+    
     try {
+      // 1. 環境變數安全檢查
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("API Key 未正確載入，請檢查 Vercel 環境變數設定");
+      }
+
       const isRel = mode === 'relationship';
-      
       const prompt = `你是一位精通全球玄學與能量系統的大師。
       主體：${user.name} (${user.birthday}) ${isRel ? `與 對象：${partner.name} (${partner.birthday})` : ''}。
-      請產出 JSON 格式數據，不得有其他文字：
+      請直接產出 JSON 格式數據，不得有其他文字或 Markdown 標籤：
       {
         "personal": {
-          "bazi": "八字格局(4字)",
+          "bazi": "格局名稱",
           "lifeNum": "主命數",
           "tzolkin": "KIN與圖騰名稱",
           "humanDesign": "類型/權威",
-          "name81": "總格與吉凶"
+          "name81": "總格吉凶"
         },
         ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
-        "dailyAdvice": "一句話能量引導"
+        "dailyAdvice": "今日能量引導語"
       }`;
 
+      // 2. 調用 Gemini API
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,10 +42,20 @@ export default function App() {
       });
 
       const res = await response.json();
-      const raw = res.candidates[0].content.parts[0].text.replace(/```json|```/g, "");
+      
+      // 檢查 API 是否回報錯誤 (例如 404 或 403)
+      if (res.error) {
+        throw new Error(res.error.message);
+      }
+
+      // 3. 處理回傳內容，去除可能干擾 JSON 解析的符號
+      let raw = res.candidates[0].content.parts[0].text;
+      raw = raw.replace(/```json|```|json|`/gi, "").trim();
+      
       setData(JSON.parse(raw));
-    } catch (e) {
-      console.error("能量解碼異常");
+    } catch (e: any) {
+      console.error("能量解碼異常:", e);
+      alert("連線異常: " + (e.message || "未知能量干擾"));
     } finally {
       setIsLoading(false);
     }
@@ -49,35 +65,51 @@ export default function App() {
     <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
       {/* 頂部標題 */}
       <header className="pt-12 pb-6 text-center">
-        <h1 className="text-3xl font-black tracking-[0.4em] text-white">AETHERIS</h1>
-        <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-2">Metaphysical Life OS</p>
+        <h1 className="text-3xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
+        <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-2 font-bold">Metaphysical Life OS</p>
       </header>
 
       {/* 模式切換 */}
       <div className="flex justify-center gap-3 mb-8">
-        <button onClick={() => setMode('personal')} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-white/5 text-slate-500'}`}>個人命盤</button>
-        <button onClick={() => setMode('relationship')} className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-[0_0_20px_rgba(219,39,119,0.4)]' : 'bg-white/5 text-slate-500'}`}>情侶同步</button>
+        <button 
+          onClick={() => { setMode('personal'); setData(null); }} 
+          className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}
+        >
+          個人命盤
+        </button>
+        <button 
+          onClick={() => { setMode('relationship'); setData(null); }} 
+          className={`px-8 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-[0_0_20px_rgba(219,39,119,0.4)]' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}
+        >
+          情侶同步
+        </button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-8">
         {/* 輸入卡片 */}
-        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-2xl shadow-2xl space-y-5">
-          <div className="space-y-4">
+        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-2xl shadow-2xl space-y-5 relative overflow-hidden group">
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-600/10 blur-[80px] rounded-full"></div>
+          
+          <div className="space-y-4 relative z-10">
             <p className="text-[10px] font-bold text-indigo-400/60 tracking-widest uppercase ml-1">Subject Alpha</p>
-            <input type="text" placeholder="SUBJECT NAME" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 transition-all outline-none" />
+            <input type="text" placeholder="您的姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 transition-all outline-none placeholder:text-slate-600" />
             <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500/50 transition-all outline-none" />
           </div>
           
           {mode === 'relationship' && (
-            <div className="pt-5 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-700">
+            <div className="pt-5 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-700 relative z-10">
               <p className="text-[10px] font-bold text-pink-400/60 tracking-widest uppercase ml-1">Subject Beta</p>
-              <input type="text" placeholder="PARTNER NAME" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 transition-all outline-none" />
+              <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 transition-all outline-none placeholder:text-slate-600" />
               <input type="date" value={partner.birthday} onChange={(e)=>setPartner({...partner, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:border-pink-500/50 transition-all outline-none" />
             </div>
           )}
 
-          <button onClick={fetchAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.3em] text-xs transition-all active:scale-95 ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-pink-600 hover:bg-pink-500 shadow-pink-900/20'} shadow-2xl`}>
-            {isLoading ? "CALCULATING..." : "INITIATE ANALYSIS"}
+          <button 
+            onClick={fetchAnalysis} 
+            disabled={isLoading} 
+            className={`w-full py-5 rounded-2xl font-black tracking-[0.3em] text-xs transition-all active:scale-95 z-10 relative ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-pink-600 hover:bg-pink-500 shadow-pink-900/20'} shadow-2xl disabled:opacity-50`}
+          >
+            {isLoading ? "ALIGNING..." : "INITIATE ANALYSIS"}
           </button>
         </div>
 
@@ -126,9 +158,9 @@ export default function App() {
             </div>
 
             {/* 4. 今日引導 */}
-            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] relative">
-              <p className="text-[10px] font-bold tracking-[0.4em] text-indigo-400 mb-4 uppercase">Aetheris Guidance</p>
-              <p className="text-base font-light leading-relaxed text-slate-300 italic">「 {data.dailyAdvice} 」</p>
+            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] relative shadow-inner">
+              <p className="text-[10px] font-bold tracking-[0.4em] text-indigo-400 mb-4 uppercase text-center">Aetheris Guidance</p>
+              <p className="text-base font-light leading-relaxed text-slate-300 italic text-center">「 {data.dailyAdvice} 」</p>
             </div>
           </div>
         )}
