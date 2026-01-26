@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// --- 小型元件：鑑定卡片 ---
+// --- 元件：鑑定數值小卡 ---
 function MiniCard({ title, value, icon }: { title: string; value: string; icon: string }) {
   return (
     <div className="bg-white/5 border border-white/5 p-6 rounded-[2.5rem] hover:bg-white/10 transition-all duration-500 group">
@@ -11,7 +11,6 @@ function MiniCard({ title, value, icon }: { title: string; value: string; icon: 
   );
 }
 
-// --- 主程式邏輯 ---
 export default function App() {
   const [user, setUser] = useState({ name: "", birthday: "" });
   const [partner, setPartner] = useState({ name: "", birthday: "" });
@@ -25,14 +24,14 @@ export default function App() {
     
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("環境變數 VITE_GEMINI_API_KEY 丟失，請檢查 Vercel 設定");
+      if (!apiKey || apiKey === "undefined" || apiKey.length < 10) {
+        throw new Error("API Key 格式異常或未讀取，請檢查 Vercel 設定");
       }
 
       const isRel = mode === 'relationship';
       const prompt = `你是一位精通全球玄學與能量系統的大師。
       主體：${user.name} (${user.birthday}) ${isRel ? `與 對象：${partner.name} (${partner.birthday})` : ''}。
-      請直接產出 JSON 格式數據，不得有其他文字：
+      請產出 JSON 格式數據，不得有 Markdown 標籤或解釋：
       {
         "personal": {
           "bazi": "格局簡述",
@@ -41,19 +40,17 @@ export default function App() {
           "humanDesign": "類型/權威",
           "name81": "吉凶"
         },
-        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振描述", "advice": "建議" },` : ''}
-        "dailyAdvice": "今日能量指引"
+        ${isRel ? `"relationship": { "syncScore": 85, "harmony": "共振狀態", "advice": "建議" },` : ''}
+        "dailyAdvice": "今日能量引導"
       }`;
 
-      // 嘗試使用的模型清單（按優先級排列） [針對 image_f3855b 的 404 報錯做出的雙重保險]
-      const models = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
-      let success = false;
-      let finalRes = null;
+      // 雙保險模型端點 [修正 404 Model Not Found]
+      const modelEndpoints = ['gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+      let finalResponse = null;
 
-      for (const modelName of models) {
-        if (success) break;
+      for (const model of modelEndpoints) {
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -61,24 +58,20 @@ export default function App() {
           });
           const res = await response.json();
           if (!res.error) {
-            finalRes = res;
-            success = true;
+            finalResponse = res;
+            break; 
           }
-        } catch (e) {
-          console.warn(`模型 ${modelName} 調用失敗，嘗試下一個...`);
-        }
+        } catch (e) { continue; }
       }
 
-      if (!success || !finalRes) {
-        throw new Error("所有 Gemini 模型端點均回傳 404 或無效，請檢查 API Key 是否啟用了 Generative Language API");
-      }
+      if (!finalResponse) throw new Error("宇宙連線失敗，請檢查 API Key 權限或稍後再試");
 
-      let raw = finalRes.candidates[0].content.parts[0].text;
+      let raw = finalResponse.candidates[0].content.parts[0].text;
       raw = raw.replace(/```json|```|json|`/gi, "").trim();
       setData(JSON.parse(raw));
 
     } catch (e: any) {
-      console.error("解析異常:", e);
+      console.error("能量解碼異常:", e);
       alert(e.message);
     } finally {
       setIsLoading(false);
@@ -87,40 +80,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-slate-200 pb-20 font-sans selection:bg-indigo-500/30">
-      {/* Header */}
       <header className="pt-16 pb-10 text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-white italic">AETHERIS</h1>
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-3 font-bold opacity-60">Metaphysical Life OS</p>
       </header>
 
-      {/* Tabs */}
       <div className="flex justify-center gap-4 mb-10">
-        <button 
-          onClick={() => { setMode('personal'); setData(null); }} 
-          className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}
-        >
-          個人鑑定
-        </button>
-        <button 
-          onClick={() => { setMode('relationship'); setData(null); }} 
-          className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}
-        >
-          雙人共振
-        </button>
+        <button onClick={() => { setMode('personal'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'bg-white/5 text-slate-500'}`}>個人鑑定</button>
+        <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-[0_10px_30px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-500'}`}>雙人共振</button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-10">
-        {/* Input UI */}
         <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-3xl shadow-2xl space-y-6">
           <div className="space-y-4">
-            <p className="text-[9px] font-bold text-indigo-400/60 tracking-widest uppercase ml-1">ALPHA SUBJECT</p>
+            <p className="text-[9px] font-bold text-indigo-400/60 tracking-widest uppercase ml-1">Alpha Subject</p>
             <input type="text" placeholder="姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500/50 transition-all outline-none" />
             <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm focus:border-indigo-500/50 transition-all outline-none" />
           </div>
           
           {mode === 'relationship' && (
             <div className="pt-6 border-t border-white/5 space-y-4 animate-in fade-in duration-700">
-              <p className="text-[9px] font-bold text-pink-400/60 tracking-widest uppercase ml-1">BETA SUBJECT</p>
+              <p className="text-[9px] font-bold text-pink-400/60 tracking-widest uppercase ml-1">Beta Subject</p>
               <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm focus:border-pink-500/50 transition-all outline-none" />
               <input type="date" value={partner.birthday} onChange={(e)=>setPartner({...partner, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm focus:border-pink-500/50 transition-all outline-none" />
             </div>
@@ -131,12 +111,11 @@ export default function App() {
           </button>
         </div>
 
-        {/* Result UI */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
             <div className="bg-gradient-to-b from-indigo-500/20 to-transparent border border-white/10 rounded-[3rem] p-10 text-center">
                  <p className="text-[10px] font-bold tracking-[0.5em] text-indigo-400 mb-2 uppercase">Mayan Sign</p>
-                 <h2 className="text-2xl font-black text-white italic">{data.personal.tzolkin}</h2>
+                 <h2 className="text-2xl font-black text-white italic text-center">{data.personal.tzolkin}</h2>
             </div>
 
             {data.relationship && (
@@ -150,12 +129,9 @@ export default function App() {
                   </svg>
                   <div className="absolute text-center">
                     <div className="text-6xl font-black text-white italic">{data.relationship.syncScore}%</div>
-                    <div className="text-[8px] font-bold tracking-[0.3em] text-pink-400/60 uppercase">Sync Score</div>
                   </div>
                 </div>
-                <p className="text-pink-400 text-[11px] font-bold tracking-widest text-center px-4">
-                  {data.relationship.harmony}
-                </p>
+                <p className="text-pink-400 text-[11px] font-bold tracking-widest text-center">{data.relationship.harmony}</p>
               </div>
             )}
 
@@ -166,9 +142,9 @@ export default function App() {
               <MiniCard title="姓名鑑定" value={data.personal.name81} icon="✨" />
             </div>
 
-            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] text-center shadow-inner">
+            <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] text-center">
               <p className="text-[10px] font-bold tracking-[0.4em] text-indigo-400 mb-5 uppercase">Oracle Guidance</p>
-              <p className="text-lg font-light leading-relaxed text-slate-300 italic px-2">「 {data.dailyAdvice} 」</p>
+              <p className="text-lg font-light leading-relaxed text-slate-300 italic">「 {data.dailyAdvice} 」</p>
             </div>
           </div>
         )}
