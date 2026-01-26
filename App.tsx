@@ -1,112 +1,121 @@
 import React, { useState, useEffect } from 'react';
 
+// --- 1. 定義數據規格 (讓 AI 輸出固定格式) ---
+interface MetaphysicData {
+  bazi: { pillars: string[]; analysis: string };
+  humanDesign: { type: string; strategy: string; authority: string };
+  tzolkin: { kin: string; totem: string; energy: string };
+  numerology: { lifeNum: number; name81: string; luckyColor: string };
+  dailyFortune: string;
+}
+
 export default function App() {
   const [user, setUser] = useState({ name: "", birthday: "" });
-  const [reading, setReading] = useState("");
+  const [data, setData] = useState<MetaphysicData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [displayText, setDisplayText] = useState("");
 
-  // 打字機效果：讓文字呈現更有占卜感
-  useEffect(() => {
-    if (reading) {
-      setDisplayText("");
-      let i = 0;
-      const interval = setInterval(() => {
-        setDisplayText((prev) => prev + reading.charAt(i));
-        i++;
-        if (i >= reading.length) clearInterval(interval);
-      }, 30);
-      return () => clearInterval(interval);
-    }
-  }, [reading]);
-
-  const getAIReading = async () => {
+  // --- 2. 數據引擎：一次獲取所有命盤資料 ---
+  const fetchFullAnalysis = async () => {
     if (!user.name || !user.birthday) return;
     setIsLoading(true);
-    setReading("");
-    setDisplayText("");
     
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      
-      // 1. 自動偵測這把 Key 目前支援的可用模型 (避開 404 問題)
-      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-      const listRes = await fetch(listUrl);
-      const listData = await listRes.json();
-      
-      const activeModel = listData.models?.find((m: any) => 
-        m.supportedGenerationMethods.includes("generateContent")
-      )?.name || "models/gemini-1.5-flash";
+      const prompt = `你是一位精通全球玄學的數據大師。
+      請針對 姓名：${user.name}，生日：${user.birthday} 進行深度解析。
+      請嚴格按照以下 JSON 格式回覆，不要有任何其他解釋文字：
+      {
+        "bazi": {"pillars": ["年柱", "月柱", "日柱", "時柱"], "analysis": "八字格局解析"},
+        "humanDesign": {"type": "類型", "strategy": "策略", "authority": "權威"},
+        "tzolkin": {"kin": "KIN編號", "totem": "圖騰名稱", "energy": "能量關鍵字"},
+        "numerology": {"lifeNum": 數字, "name81": "吉凶解析", "luckyColor": "顏色"},
+        "dailyFortune": "今日綜合運勢鑑定(150字)"
+      }`;
 
-      // 2. 發起運勢請求
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${activeModel}:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
+      // 使用我們之前跑通的 fetch 邏輯 (此處簡略，請沿用之前的 API 呼叫代碼)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `你是一位精通紫微與星象的玄學大師。姓名：${user.name}，生日：${user.birthday}。請為他撰寫今日鑑定。包含：總體運勢、事業財運、情感叮嚀。語氣神祕且溫暖，使用繁體中文，約 150 字，分段呈現。` }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
 
-      const data = await response.json();
-      const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (result) {
-        setReading(result);
-      } else {
-        throw new Error(data.error?.message || "星象模糊");
-      }
-    } catch (error: any) {
-      console.error("系統異常:", error);
-      setReading(`${user.name}居士，今日星象顯示你氣場平穩。建議今日多行善念，凡事隨緣，必有後福。 (系統提示：${error.message})`);
+      const res = await response.json();
+      const rawJson = res.candidates[0].content.parts[0].text.replace(/```json|```/g, "");
+      setData(JSON.parse(rawJson));
+    } catch (e) {
+      console.error("能量鏈接中斷", e);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#030308] text-slate-200 p-6 flex flex-col items-center selection:bg-indigo-500/30">
-      <div className="max-w-md w-full mt-16 space-y-10">
-        <header className="text-center space-y-3">
-          <h1 className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-indigo-200 to-indigo-500">
-            Aetheris OS
-          </h1>
-          <p className="text-[10px] tracking-[0.5em] text-indigo-400/50 uppercase font-bold">Metaphysic Intelligence</p>
-        </header>
-        
-        <main className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-xl">
-          <div className="space-y-6">
-            <div>
-              <label className="text-[10px] text-indigo-300 font-bold ml-1 uppercase tracking-widest opacity-60">Subject Identity</label>
-              <input type="text" placeholder="輸入姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-1 outline-none focus:border-indigo-500 transition-all text-white" />
-            </div>
-            <div>
-              <label className="text-[10px] text-indigo-300 font-bold ml-1 uppercase tracking-widest opacity-60">Birth Sequence</label>
-              <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-1 outline-none focus:border-indigo-500 transition-all text-white" />
-            </div>
-            <button onClick={getAIReading} disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 py-5 rounded-2xl font-black transition-all active:scale-95 disabled:opacity-30 shadow-[0_0_30px_rgba(79,70,229,0.2)]">
-              {isLoading ? "CALCULATING..." : "獲取大師鑑定"}
-            </button>
-          </div>
-        </main>
+    <div className="min-h-screen bg-[#050508] text-white p-6 font-sans">
+      {/* 頂部 Header */}
+      <header className="text-center mb-10">
+        <h1 className="text-4xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+          AETHERIS OS
+        </h1>
+        <p className="text-[10px] text-indigo-500/60 tracking-[0.5em] mt-2 uppercase">Spiritual Technology System</p>
+      </header>
 
-        {displayText && (
-          <section className="p-10 rounded-[2.5rem] bg-indigo-950/10 border border-white/5 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></div>
-              <h3 className="text-[10px] font-black text-indigo-300 tracking-[0.4em] uppercase">Insight Analysis</h3>
-            </div>
-            <div className="text-slate-300 leading-relaxed text-lg font-light italic whitespace-pre-wrap">
-              {displayText}
-            </div>
-            <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center opacity-20">
-              <span className="text-[8px] tracking-[0.2em] uppercase font-bold">Aetheris Core 1.5.2</span>
-              <span className="text-[8px] font-mono tracking-tighter">STATUS: STABLE</span>
-            </div>
-          </section>
-        )}
+      {/* 輸入模組 */}
+      <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 mb-8 backdrop-blur-xl">
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <input type="text" placeholder="NAME" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="bg-black/20 border border-white/5 rounded-xl p-4 text-sm" />
+          <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="bg-black/20 border border-white/5 rounded-xl p-4 text-sm" />
+        </div>
+        <button onClick={fetchFullAnalysis} disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 py-4 rounded-xl font-bold tracking-widest transition-all">
+          {isLoading ? "CALCULATING..." : "START ANALYSIS"}
+        </button>
       </div>
+
+      {/* 數據卡片區域 - 這是實現 image_cdc452 質感的關鍵 */}
+      {data && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-1000">
+          
+          {/* 卓爾金曆：模仿 image_cdc46c 的圓形或強調設計 */}
+          <section className="bg-gradient-to-b from-indigo-500/10 to-transparent border border-indigo-500/20 p-8 rounded-[2.5rem] text-center">
+            <div className="text-xs text-indigo-400 font-bold tracking-widest mb-2">{data.tzolkin.kin}</div>
+            <h2 className="text-3xl font-black mb-1">{data.tzolkin.totem}</h2>
+            <p className="text-xs text-slate-400">{data.tzolkin.energy}</p>
+          </section>
+
+          {/* 四格小卡：模仿 image_cdc452 的 Status Overview */}
+          <div className="grid grid-cols-2 gap-4">
+            <InfoCard title="八字能量" value={data.bazi.pillars[2]} sub={data.bazi.analysis} />
+            <Card title="生命靈數" value={String(data.numerology.lifeNum)} />
+            <Card title="81 靈動數" value={data.numerology.name81} />
+            <Card title="人類圖權威" value={data.humanDesign.authority} />
+          </div>
+
+          {/* 運勢大卡 */}
+          <div className="p-8 bg-white/5 border border-white/5 rounded-[2.5rem]">
+            <h4 className="text-[10px] text-indigo-400 font-bold tracking-[0.3em] mb-4">DAILY INSIGHT</h4>
+            <p className="text-lg leading-relaxed italic font-light">「{data.dailyFortune}」</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- 3. 視覺組件 (保持 UI 一致性) ---
+function Card({ title, value }: any) {
+  return (
+    <div className="bg-white/5 border border-white/10 p-5 rounded-3xl">
+      <p className="text-[10px] text-slate-500 font-bold mb-2 uppercase">{title}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function InfoCard({ title, value, sub }: any) {
+  return (
+    <div className="bg-white/5 border border-white/10 p-5 rounded-3xl">
+      <p className="text-[10px] text-slate-500 font-bold mb-2 uppercase">{title}</p>
+      <p className="text-xl font-bold text-indigo-400">{value}</p>
+      <p className="text-[10px] text-slate-500 mt-1 truncate">{sub}</p>
     </div>
   );
 }
