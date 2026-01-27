@@ -43,7 +43,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
-  // 🔥 最終攔截器：確保年份不超過 4 位數
+  // 🔥 核心修正：年份 4 位限制邏輯 (已修正語法錯誤)
   const handleDateChange = (val: string, target: 'user' | 'partner') => {
     if (!val) {
       if (target === 'user') setUser(prev => ({ ...prev, birthday: "" }));
@@ -55,10 +55,9 @@ export default function App() {
     const year = parts[0];
 
     if (year && year.length > 4) {
-      // 強制截斷
       const correctedDate = `${year.slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
       if (target === 'user') setUser(prev => ({ ...prev, birthday: correctedDate }));
-      else setPartner(prev => ({ ...prev, birthday: correctedDate });
+      else setPartner(prev => ({ ...prev, birthday: correctedDate })); // ✅ 此處括號已補齊
     } else {
       if (target === 'user') setUser(prev => ({ ...prev, birthday: val }));
       else setPartner(prev => ({ ...prev, birthday: val }));
@@ -92,7 +91,6 @@ export default function App() {
       </header>
 
       <main className="max-w-xl mx-auto px-6 relative z-10 space-y-12">
-        {/* 輸入區域 */}
         <div className="bg-white/[0.02] border border-white/[0.08] rounded-[3rem] p-10 backdrop-blur-2xl shadow-2xl">
           <div className="flex bg-black/40 p-1.5 rounded-2xl mb-8">
             <button onClick={() => { setMode('personal'); setData(null); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500'}`}>個人鑑定</button>
@@ -122,13 +120,12 @@ export default function App() {
                 />
               </div>
             )}
-            <button onClick={handleStartAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[10px] transition-all duration-500 shadow-2xl ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} disabled:opacity-20`}>
+            <button onClick={handleStartAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[10px] transition-all duration-500 shadow-2xl ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} disabled:opacity-20 active:scale-95`}>
               {isLoading ? "SYNCHRONIZING..." : "INITIATE ANALYSIS"}
             </button>
           </div>
         </div>
 
-        {/* 結果區域 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-12 duration-1000">
             <div className="bg-gradient-to-r from-indigo-500/10 via-pink-500/10 to-transparent border border-white/10 rounded-[3rem] p-10 relative overflow-hidden group">
@@ -136,7 +133,7 @@ export default function App() {
               <p className="text-[10px] font-black tracking-[0.5em] text-indigo-400 mb-6 uppercase italic">Daily Insight</p>
               <p className="text-xl leading-relaxed text-slate-200 font-serif italic">"{data.dailyAdvice}"</p>
               <div className="mt-8 flex flex-wrap gap-3">
-                {data.luckyIndicators?.action?.map((a, i) => (
+                {data.luckyIndicators?.action?.map((a: string, i: number) => (
                   <span key={i} className="px-4 py-1.5 bg-white/5 rounded-full text-[9px] font-bold text-slate-400 border border-white/5">宜：{a}</span>
                 ))}
               </div>
@@ -147,7 +144,7 @@ export default function App() {
                 <div className="space-y-6">
                   <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用神：${data.personal.eastern.bazi.favorable}`} />
                   <DataTag label="姓名學-五格" value={`總格 ${data.personal.eastern.nameAnalysis.fiveGrids.total} - ${data.personal.eastern.nameAnalysis.luck81}`} sub={`三才：${data.personal.eastern.nameAnalysis.threeTalents}`} />
-                  <p className="text-[10px] leading-relaxed text-slate-400 italic">{data.personal.eastern.bazi.analysis}</p>
+                  <p className="text-[10px] leading-relaxed text-slate-400 italic line-clamp-3">{data.personal.eastern.bazi.analysis}</p>
                 </div>
               </GlassCard>
 
