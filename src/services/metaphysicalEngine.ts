@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Language } from "../types";
 
-// 初始化 Gemini AI
+// 初始化 Gemini AI - 強制使用 v1beta 以支援最新模型
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
 export interface MetaphysicResult {
@@ -11,9 +10,9 @@ export interface MetaphysicResult {
     tzolkin: { kin: string; totem: string; energy: string };
     numerology: { 
       lifeNum: number; 
-      grid: number[];      // 生命靈數九宮格
-      arrows: string[];    // 力量線
-      name81: {            // 修正：將 81 靈動數結構化
+      grid: number[];
+      arrows: string[];
+      name81: {
         strokes: number;
         luck: string;
         analysis: string;
@@ -32,35 +31,29 @@ export interface MetaphysicResult {
 
 export class MetaphysicalEngine {
   
-  /**
-   * 核心引擎：本地運算 + AI 深度解析
-   */
   static async getFullAnalysis(
     user: { name: string; birthday: string }, 
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // 升級重點：切換至 gemini-3-flash-preview 並指定 v1beta
+    const model = genAI.getGenerativeModel(
+      { model: "gemini-3-flash-preview" }, 
+      { apiVersion: 'v1beta' }
+    );
+    
     const isRel = !!partner?.name;
-
-    // 1. 本地硬核計算
     const userNum = this.calculateNumerology(user.birthday);
     const userStrokes = this.calculate81Strokes(user.name);
     
-    // 2. 構建 Prompt
     const prompt = `
       你是一位精通全球玄學與能量系統的大師 Aetheris。
-      
-      ## 精確運算數據 (不可更改)
+      請根據以下精確數據進行深度解析：
       - 使用者：${user.name} (生日: ${user.birthday})
       - 生命靈數：${userNum.lifePathNum}
-      - 生命靈數九宮格分佈：${JSON.stringify(userNum.grid)}
-      - 姓名總格筆劃：${userStrokes} (請根據此筆劃進行81靈動數吉凶解析)
+      - 姓名總格筆劃：${userStrokes}
       ${isRel ? `- 合盤對象：${partner?.name} (生日: ${partner?.birthday})` : ''}
 
-      ## 任務要求
-      請根據以上數據進行深度解析（包含八字、人類圖、卓爾金曆、81靈動數解析）。
       請嚴格按照以下 JSON 格式回覆，不要有任何解釋文字：
-
       {
         "personal": {
           "bazi": { "pillars": ["年柱", "月柱", "日柱", "時柱"], "analysis": "格局解析", "elements": "五行強弱" },
@@ -70,11 +63,7 @@ export class MetaphysicalEngine {
             "lifeNum": ${userNum.lifePathNum}, 
             "grid": ${JSON.stringify(userNum.grid)},
             "arrows": ${JSON.stringify(userNum.lines)},
-            "name81": {
-              "strokes": ${userStrokes},
-              "luck": "吉/凶/平",
-              "analysis": "針對${userStrokes}劃的靈動數解析"
-            },
+            "name81": { "strokes": ${userStrokes}, "luck": "吉/凶", "analysis": "解析" },
             "luckyColor": "幸運色" 
           }
         },
@@ -90,12 +79,10 @@ export class MetaphysicalEngine {
       const cleanJson = text.replace(/```json|```/g, "").trim();
       return JSON.parse(cleanJson) as MetaphysicResult;
     } catch (error) {
-      console.error("宇宙能量鏈接中斷:", error);
-      throw new Error("API 連結失敗，請檢查網路或金鑰。");
+      console.error("API Error:", error);
+      throw new Error("宇宙能量鏈接中斷，請稍後再試。");
     }
   }
-
-  // --- 硬核邏輯運算區 ---
 
   static calculateNumerology(birthday: string) {
     const digits = birthday.replace(/\D/g, '');
@@ -104,28 +91,18 @@ export class MetaphysicalEngine {
       const num = parseInt(d);
       if (num > 0) grid[num]++;
     });
-
-    const reduce = (numStr: string): number => {
-      const sum = numStr.split('').reduce((acc, d) => acc + parseInt(d, 10), 0);
-      if (sum === 11 || sum === 22 || sum === 33) return sum;
-      return sum > 9 ? reduce(sum.toString()) : sum;
+    const reduce = (n: string): number => {
+      const s = n.split('').reduce((a, d) => a + parseInt(d), 0);
+      return (s > 9 && s !== 11 && s !== 22 && s !== 33) ? reduce(s.toString()) : s;
     };
-
     const lines = [];
     const check = (a: number, b: number, c: number) => grid[a] > 0 && grid[b] > 0 && grid[c] > 0;
-    if (check(1, 2, 3)) lines.push('123-體能線');
-    if (check(4, 5, 6)) lines.push('456-情緒線');
-    if (check(7, 8, 9)) lines.push('789-行動線');
-    if (check(1, 5, 9)) lines.push('159-意志線');
-    if (check(3, 5, 7)) lines.push('357-人緣線');
-
+    if (check(1,2,3)) lines.push('123'); if (check(4,5,6)) lines.push('456');
     return { lifePathNum: reduce(digits), grid, lines };
   }
 
   static calculate81Strokes(name: string): number {
     if (!name) return 0;
-    // 這裡先採簡單模擬邏輯，未來建議接繁體筆劃資料庫
-    const base = name.split('').reduce((acc, char) => acc + (char.charCodeAt(0) % 10) + 1, 0);
-    return (base % 81) || 81;
+    return (name.split('').reduce((a, c) => a + (c.charCodeAt(0) % 10) + 1, 0) % 81) || 81;
   }
 }
