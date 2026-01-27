@@ -34,13 +34,12 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
-  // --- 修正過的分析啟動函數 ---
   const handleStartAnalysis = async () => {
     // 1. 基本輸入檢查
     if (!user.name || !user.birthday) return alert("請填寫您的姓名與生日");
     if (mode === 'relationship' && (!partner.name || !partner.birthday)) return alert("請填寫對象的姓名與生日");
 
-    // 2. 環境變數診斷 (這會在瀏覽器 Console 顯示)
+    // 2. 環境變數診斷
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     const isDev = import.meta.env.DEV;
 
@@ -50,7 +49,7 @@ export default function App() {
     
     if (!apiKey) {
       const errorMsg = isDev 
-        ? "【本地錯誤】：找不到 .env 中的 VITE_GEMINI_API_KEY。請檢查檔案並重啟 npm run dev。" 
+        ? "【本地錯誤】：找不到 .env 中的 VITE_GEMINI_API_KEY。請檢查檔案並重啟。" 
         : "【線上錯誤】：Vercel 讀取不到環境變數。請在 Vercel 設定後 Redeploy。";
       return alert(errorMsg);
     }
@@ -67,11 +66,8 @@ export default function App() {
       setData(result);
     } catch (e: any) {
       console.error("❌ 系統崩潰詳細資訊:", e);
-      if (e.message.includes('404')) {
-        alert("能量維度錯誤 (404)：模型路徑無效。請確認 Engine 指定了 v1beta。");
-      } else {
-        alert("宇宙能量連結失敗：" + e.message);
-      }
+      // 統一錯誤處理，包含之前的 404 邏輯
+      alert(e.message.includes('404') ? "能量維度錯誤 (404)：請確認服務層使用 v1beta 與正確模型 ID。" : e.message);
     } finally {
       setIsLoading(false);
     }
