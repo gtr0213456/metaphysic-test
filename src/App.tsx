@@ -35,28 +35,19 @@ export default function App() {
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
   const handleStartAnalysis = async () => {
-    // 1. 基本輸入檢查
     if (!user.name || !user.birthday) return alert("請填寫您的姓名與生日");
     if (mode === 'relationship' && (!partner.name || !partner.birthday)) return alert("請填寫對象的姓名與生日");
 
-    // 2. 環境變數診斷
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    const isDev = import.meta.env.DEV;
-
-    console.log("--- 🔮 Aetheris 系統診斷 ---");
-    console.log("當前環境:", isDev ? "本地開發 (Local)" : "線上部署 (Production)");
-    console.log("API Key 狀態:", apiKey ? "✅ 已讀取" : "❌ 未定義");
     
+    // 安全診斷：確保 Key 沒有失效
     if (!apiKey) {
-      const errorMsg = isDev 
-        ? "【本地錯誤】：找不到 .env 中的 VITE_GEMINI_API_KEY。請檢查檔案並重啟。" 
-        : "【線上錯誤】：Vercel 讀取不到環境變數。請在 Vercel 設定後 Redeploy。";
-      return alert(errorMsg);
+      return alert("系統偵測不到 API Key。請確認 .env 或 Vercel 設定。");
     }
 
     setIsLoading(true);
     try {
-      console.log("🚀 正在連結宇宙模型...");
+      console.log("🚀 能量初始化：嘗試連結 v1beta 宇宙端點...");
       const result = await MetaphysicalEngine.getFullAnalysis(
         user, 
         mode === 'relationship' ? partner : undefined
@@ -65,9 +56,13 @@ export default function App() {
       console.log("✅ 能量解析成功:", result);
       setData(result);
     } catch (e: any) {
-      console.error("❌ 系統崩潰詳細資訊:", e);
-      // 統一錯誤處理，包含之前的 404 邏輯
-      alert(e.message.includes('404') ? "能量維度錯誤 (404)：請確認服務層使用 v1beta 與正確模型 ID。" : e.message);
+      console.error("❌ 系統中斷:", e);
+      // 針對洩漏報錯進行特別提醒
+      if (e.message.includes('403') || e.message.includes('leaked')) {
+        alert("🚨 安全警告：您的 API Key 已被 Google 標記為洩漏。請前往 AI Studio 撤銷舊 Key 並重新產生一個。");
+      } else {
+        alert("宇宙連線失敗：" + e.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -80,25 +75,23 @@ export default function App() {
         <p className="text-[10px] text-indigo-400 tracking-[0.5em] uppercase mt-3 font-bold opacity-60">Metaphysical Life OS</p>
       </header>
 
-      {/* Mode Switcher */}
       <div className="flex justify-center gap-4 mb-10">
         <button onClick={() => { setMode('personal'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'personal' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>個人鑑定</button>
         <button onClick={() => { setMode('relationship'); setData(null); }} className={`px-10 py-3 rounded-full text-[10px] font-bold tracking-widest transition-all duration-500 ${mode === 'relationship' ? 'bg-pink-600 shadow-lg shadow-pink-500/20' : 'bg-white/5 text-slate-500 hover:bg-white/10'}`}>雙人共振</button>
       </div>
 
       <div className="max-w-md mx-auto px-6 space-y-10">
-        {/* Input Form */}
         <div className="bg-white/5 border border-white/10 rounded-[3rem] p-8 backdrop-blur-3xl shadow-2xl space-y-6">
           <div className="space-y-4">
             <label className="text-[9px] font-bold text-indigo-400 tracking-widest uppercase ml-2 italic">User Profile</label>
-            <input type="text" placeholder="您的姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all" />
+            <input type="text" placeholder="您的姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white" />
             <input type="date" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-slate-400" />
           </div>
           
           {mode === 'relationship' && (
             <div className="pt-6 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-2">
               <label className="text-[9px] font-bold text-pink-400 tracking-widest uppercase ml-2 italic">Partner Profile</label>
-              <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all" />
+              <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" />
               <input type="date" value={partner.birthday} onChange={(e)=>setPartner({...partner, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-slate-400" />
             </div>
           )}
@@ -108,7 +101,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Results Area */}
         {data && (
           <div className="space-y-8 animate-in fade-in zoom-in duration-700">
             <div className="bg-gradient-to-b from-indigo-500/20 to-transparent border border-white/10 rounded-[3rem] p-8 text-center relative overflow-hidden">
