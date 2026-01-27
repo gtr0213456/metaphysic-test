@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 初始化 Gemini AI - 強制使用 v1beta 以支援最新模型
+// 修正：明確指向 v1beta 節點
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
 export interface MetaphysicResult {
@@ -12,11 +12,7 @@ export interface MetaphysicResult {
       lifeNum: number; 
       grid: number[];
       arrows: string[];
-      name81: {
-        strokes: number;
-        luck: string;
-        analysis: string;
-      };
+      name81: { strokes: number; luck: string; analysis: string };
       luckyColor: string 
     };
   };
@@ -35,10 +31,13 @@ export class MetaphysicalEngine {
     user: { name: string; birthday: string }, 
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
-    // 升級重點：切換至 gemini-3-flash-preview 並指定 v1beta
+    
+    // 修正：明確在獲取模型時指定 apiVersion 為 'v1beta'
+    // 這裡使用 gemini-2.0-flash 或 gemini-1.5-flash 作為目前最穩定的節點
+    // 如果你想嚐鮮 gemini-3，請確保你的 API Key 權限已開通
     const model = genAI.getGenerativeModel(
-      { model: "gemini-3-flash-preview" }, 
-      { apiVersion: 'v1beta' }
+      { model: "gemini-1.5-flash" }, 
+      { apiVersion: 'v1beta' } 
     );
     
     const isRel = !!partner?.name;
@@ -47,40 +46,39 @@ export class MetaphysicalEngine {
     
     const prompt = `
       你是一位精通全球玄學與能量系統的大師 Aetheris。
-      請根據以下精確數據進行深度解析：
+      請根據以下數據進行深度解析：
       - 使用者：${user.name} (生日: ${user.birthday})
       - 生命靈數：${userNum.lifePathNum}
       - 姓名總格筆劃：${userStrokes}
       ${isRel ? `- 合盤對象：${partner?.name} (生日: ${partner?.birthday})` : ''}
 
-      請嚴格按照以下 JSON 格式回覆，不要有任何解釋文字：
+      請嚴格按照以下 JSON 格式回覆，不含解釋：
       {
         "personal": {
-          "bazi": { "pillars": ["年柱", "月柱", "日柱", "時柱"], "analysis": "格局解析", "elements": "五行強弱" },
-          "humanDesign": { "type": "類型", "authority": "內在權威", "strategy": "策略", "profile": "人生角色" },
-          "tzolkin": { "kin": "KIN編號", "totem": "圖騰名稱", "energy": "能量關鍵字" },
+          "bazi": { "pillars": ["年柱", "月柱", "日柱", "時柱"], "analysis": "格局解析", "elements": "五行" },
+          "humanDesign": { "type": "類型", "authority": "權威", "strategy": "策略", "profile": "角色" },
+          "tzolkin": { "kin": "KIN", "totem": "圖騰", "energy": "關鍵字" },
           "numerology": { 
             "lifeNum": ${userNum.lifePathNum}, 
             "grid": ${JSON.stringify(userNum.grid)},
             "arrows": ${JSON.stringify(userNum.lines)},
             "name81": { "strokes": ${userStrokes}, "luck": "吉/凶", "analysis": "解析" },
-            "luckyColor": "幸運色" 
+            "luckyColor": "顏色" 
           }
         },
-        "relationship": ${isRel ? '{ "syncScore": 85, "harmony": "共振描述", "advice": "相處建議", "peakTime": "今日最佳互動時機" }' : 'null'},
-        "dailyAdvice": "今日綜合能量指引(150字內)"
+        "relationship": ${isRel ? '{ "syncScore": 85, "harmony": "共振", "advice": "建議", "peakTime": "22:00" }' : 'null'},
+        "dailyAdvice": "今日指引"
       }
     `;
 
     try {
       const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const text = result.response.text();
       const cleanJson = text.replace(/```json|```/g, "").trim();
       return JSON.parse(cleanJson) as MetaphysicResult;
     } catch (error) {
-      console.error("API Error:", error);
-      throw new Error("宇宙能量鏈接中斷，請稍後再試。");
+      console.error("API Error Detail:", error);
+      throw new Error(`能量鏈接中斷: ${error instanceof Error ? error.message : '未知錯誤'}`);
     }
   }
 
@@ -95,9 +93,10 @@ export class MetaphysicalEngine {
       const s = n.split('').reduce((a, d) => a + parseInt(d), 0);
       return (s > 9 && s !== 11 && s !== 22 && s !== 33) ? reduce(s.toString()) : s;
     };
-    const lines = [];
     const check = (a: number, b: number, c: number) => grid[a] > 0 && grid[b] > 0 && grid[c] > 0;
-    if (check(1,2,3)) lines.push('123'); if (check(4,5,6)) lines.push('456');
+    const lines = [];
+    if (check(1,2,3)) lines.push('123');
+    if (check(4,5,6)) lines.push('456');
     return { lifePathNum: reduce(digits), grid, lines };
   }
 
