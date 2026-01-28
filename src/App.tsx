@@ -19,7 +19,7 @@ export default function App() {
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
   const handleStartAnalysis = async () => {
-    if (!user.name || !user.birthday) return alert("請輸入姓名與生日");
+    if (!user.name || !user.birthday) return alert("請輸入姓名與生辰");
     setIsLoading(true);
     try {
       const apiUser = { ...user, birthday: user.birthday.replace(/\//g, '-') };
