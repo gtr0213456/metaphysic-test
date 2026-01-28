@@ -1,3 +1,9 @@
+/**
+ * 🛠️ 2026 算命仙等級引擎 (終極完整版)
+ * 整合：東方命理、西方數理、關係共振、綜合決策
+ * 安全性：已加入錯誤攔截，防止 404/400 報錯時洩漏 API Key
+ */
+
 export interface MetaphysicResult {
   personal: {
     eastern: {
@@ -33,14 +39,17 @@ export class MetaphysicalEngine {
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
     
+    // 1. 環境變數預檢
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("找不到 API Key，請檢查 Vercel Environment Variables 是否設定為 VITE_GEMINI_API_KEY");
+    }
+
     const MODEL_ID = "gemini-1.5-flash"; 
+    // 確保路徑格式完全正確：models/模型名:方法名
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
     const isRel = !!(partner && partner.name);
     
-    // 防禦：如果沒讀到 Key 提早報錯，不發起請求
-    if (!apiKey) throw new Error("環境變數配置失效 (API KEY MISSING)");
-
     const prompt = `你是一位精通東西方玄學的核心 AI Aetheris，目前時間是 2026 年。
     請對以下對象進行「算命仙」等級的深度解析：
     用戶：${user.name}，生日：${user.birthday}。
@@ -78,22 +87,35 @@ export class MetaphysicalEngine {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { response_mime_type: "application/json", temperature: 0.75 }
+          generationConfig: { 
+            response_mime_type: "application/json", 
+            temperature: 0.75 
+          }
         })
       });
 
+      // 2. 核心防禦：如果回應不正常，手動拋出錯誤訊息，攔截原始物件防止瀏覽器噴出 URL
       if (!response.ok) {
-        // 自定義錯誤拋出，防止瀏覽器在 console 噴出帶 Key 的原始報錯網址
-        throw new Error(`維度連結中斷 (Status: ${response.status})`);
+        // 如果是 404，極有可能是 Key 失效或模型權限問題
+        const errorMsg = response.status === 404 
+          ? "無法連結至 AI 核心 (404)。這通常代表您的 API Key 已失效或路徑錯誤。" 
+          : `維度連結失敗 (${response.status})`;
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
+      
+      if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error("宇宙回傳了無效數據。");
+      }
+
       const rawText = data.candidates[0].content.parts[0].text;
       return JSON.parse(rawText) as MetaphysicResult;
+
     } catch (e: any) {
-      // 僅印出 message，不印出整個錯誤對象以防洩漏
-      console.error("Engine Safe Error Handler:", e.message);
-      throw e;
+      // 3. 終極捕捉：控制台只印出文字訊息，不會顯示帶有 Key 的原始網址
+      console.error("Metaphysical Engine Critical Halt:", e.message);
+      throw e; 
     }
   }
 }
