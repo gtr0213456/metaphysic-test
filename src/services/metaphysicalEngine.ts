@@ -1,9 +1,3 @@
-/**
- * 🛠️ 2026 算命仙等級引擎 (終極完整版)
- * 整合：東方命理、西方數理、關係共振、綜合決策
- * 安全性：已加入錯誤攔截，防止 404/400 報錯時洩漏 API Key
- */
-
 export interface MetaphysicResult {
   personal: {
     eastern: {
@@ -39,83 +33,51 @@ export class MetaphysicalEngine {
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
     
-    // 1. 環境變數預檢
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("找不到 API Key，請檢查 Vercel Environment Variables 是否設定為 VITE_GEMINI_API_KEY");
-    }
+    if (!apiKey) throw new Error("環境變數 VITE_GEMINI_API_KEY 未配置");
 
-    const MODEL_ID = "gemini-1.5-flash"; 
-    // 確保路徑格式完全正確：models/模型名:方法名
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
+    const MODEL_ID = "gemini-1.5-flash";
     const isRel = !!(partner && partner.name);
     
-    const prompt = `你是一位精通東西方玄學的核心 AI Aetheris，目前時間是 2026 年。
-    請對以下對象進行「算命仙」等級的深度解析：
+    // 💡 備選路徑方案：有些新 Key 在 v1beta 會報 404，但在 v1 卻正常
+    const apiVersions = ['v1beta', 'v1'];
+    let lastError = "";
+
+    const prompt = `你是一位精通東西方玄學的核心 AI Aetheris。
     用戶：${user.name}，生日：${user.birthday}。
     ${isRel ? `合盤對象：${partner?.name}，生日：${partner?.birthday}。` : ""}
+    要求：嚴格輸出 JSON 格式，包含八字、紫微、姓名學、人類圖、生命靈數、卓爾金曆、關係合盤與今日宜忌。`;
 
-    要求：
-    1. 嚴格輸出 JSON 格式。
-    2. 東方：包含八字日主強弱與喜用神、姓名學五格計算（康熙筆畫）、81靈動數、三才配置。
-    3. 西方：包含人類圖特定通道、生命靈數九宮格連線、卓爾金曆波符。
-    4. 關係：計算兩人能量共振、通訊語氣建議、衝突雷區預警。
-    5. 決策：提供今日宜忌、幸運色、方位。
+    for (const version of apiVersions) {
+      try {
+        const API_URL = `https://generativelanguage.googleapis.com/${version}/models/${MODEL_ID}:generateContent?key=${apiKey}`;
+        
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { response_mime_type: "application/json", temperature: 0.75 }
+          })
+        });
 
-    JSON 結構必須精確如下：
-    {
-      "personal": {
-        "eastern": {
-          "bazi": { "pillars": ["年","月","日","時"], "strength": "", "favorable": "", "analysis": "" },
-          "ziwei": { "mainStars": "", "palace": "", "luck": "" },
-          "nameAnalysis": { "strokes": 0, "fiveGrids": {"heaven":0,"man":0,"earth":0,"out":0,"total":0}, "luck81": "", "threeTalents": "" }
-        },
-        "western": {
-          "humanDesign": { "type": "", "authority": "", "strategy": "", "profile": "", "channels": [] },
-          "numerology": { "lifeNum": 0, "grid": [0,0,0,0,0,0,0,0,0], "arrows": [], "personalYear": "" },
-          "tzolkin": { "kin": "", "totem": "", "tone": "", "wave": "" }
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates[0].content.parts[0].text;
+          return JSON.parse(rawText) as MetaphysicResult;
         }
-      },
-      "relationship": { "syncScore": 0, "harmony": "", "advice": "", "warning": "", "communicationTone": "" },
-      "dailyAdvice": "",
-      "luckyIndicators": { "color": "", "direction": "", "action": [] }
-    }`;
 
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            response_mime_type: "application/json", 
-            temperature: 0.75 
-          }
-        })
-      });
-
-      // 2. 核心防禦：如果回應不正常，手動拋出錯誤訊息，攔截原始物件防止瀏覽器噴出 URL
-      if (!response.ok) {
-        // 如果是 404，極有可能是 Key 失效或模型權限問題
-        const errorMsg = response.status === 404 
-          ? "無法連結至 AI 核心 (404)。這通常代表您的 API Key 已失效或路徑錯誤。" 
-          : `維度連結失敗 (${response.status})`;
-        throw new Error(errorMsg);
+        // 捕捉 404，嘗試下一個版本
+        const errorData = await response.json().catch(() => ({}));
+        lastError = errorData.error?.message || `Status ${response.status}`;
+        
+      } catch (e: any) {
+        lastError = e.message;
       }
-
-      const data = await response.json();
-      
-      if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        throw new Error("宇宙回傳了無效數據。");
-      }
-
-      const rawText = data.candidates[0].content.parts[0].text;
-      return JSON.parse(rawText) as MetaphysicResult;
-
-    } catch (e: any) {
-      // 3. 終極捕捉：控制台只印出文字訊息，不會顯示帶有 Key 的原始網址
-      console.error("Metaphysical Engine Critical Halt:", e.message);
-      throw e; 
     }
+
+    // 如果所有版本都失敗，統一拋出錯誤，且「絕對不印出」包含 Key 的原始 Error
+    console.error("Engine Blocked a potential leak. Error info:", lastError);
+    throw new Error(`維度連結中斷: ${lastError}。請確認 Google AI Studio 專案已啟用且 Key 有效。`);
   }
 }
