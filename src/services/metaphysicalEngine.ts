@@ -33,57 +33,18 @@ export class MetaphysicalEngine {
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
     
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error("環境變數 VITE_GEMINI_API_KEY 未配置");
+    // 💡 這裡不再呼叫 Google，而是呼叫你自己專案的 API 路由
+    const response = await fetch("/api/metaphysics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user, partner })
+    });
 
-    // 💡 嘗試最穩定的模型順序
-    const MODEL_CANDIDATES = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash-exp"];
-    const isRel = !!(partner && partner.name);
-    
-    const prompt = `你是一位精通東西方玄學的核心 AI Aetheris。
-    用戶：${user.name}，生日：${user.birthday}。
-    ${isRel ? `合盤對象：${partner?.name}，生日：${partner?.birthday}。` : ""}
-    要求：嚴格輸出 JSON 格式，包含八字、紫微、姓名學、人類圖、生命靈數、卓爾金曆、關係合盤與今日宜忌。`;
-
-    let lastError = "";
-
-    for (const modelId of MODEL_CANDIDATES) {
-      try {
-        // 固定使用 v1beta，因為只有它支援 responseMimeType
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-        
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { 
-              responseMimeType: "application/json", // 必須是小駝峰
-              temperature: 0.8 
-            }
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const rawText = data.candidates[0].content.parts[0].text;
-          return JSON.parse(rawText) as MetaphysicResult;
-        }
-
-        const errorData = await response.json().catch(() => ({}));
-        lastError = errorData.error?.message || `Status ${response.status}`;
-        
-        // 如果是 404 則嘗試下一個模型 ID
-        if (response.status === 404) continue;
-        else break; 
-
-      } catch (e: any) {
-        lastError = e.message;
-      }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "維度連結失敗，請檢查網路或金鑰配置");
     }
 
-    // 🔴 攔截報錯，保護 API Key 不被瀏覽器噴出
-    console.error("Engine Safe Error:", lastError);
-    throw new Error(`維度連結中斷: ${lastError}`);
+    return await response.json() as MetaphysicResult;
   }
 }
