@@ -32,11 +32,15 @@ export class MetaphysicalEngine {
     user: { name: string; birthday: string }, 
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
+    
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     const MODEL_ID = "gemini-1.5-flash"; 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
     const isRel = !!(partner && partner.name);
     
+    // 防禦：如果沒讀到 Key 提早報錯，不發起請求
+    if (!apiKey) throw new Error("環境變數配置失效 (API KEY MISSING)");
+
     const prompt = `你是一位精通東西方玄學的核心 AI Aetheris，目前時間是 2026 年。
     請對以下對象進行「算命仙」等級的深度解析：
     用戶：${user.name}，生日：${user.birthday}。
@@ -78,11 +82,17 @@ export class MetaphysicalEngine {
         })
       });
 
-      if (!response.ok) throw new Error(`維度連結中斷 (${response.status})`);
+      if (!response.ok) {
+        // 自定義錯誤拋出，防止瀏覽器在 console 噴出帶 Key 的原始報錯網址
+        throw new Error(`維度連結中斷 (Status: ${response.status})`);
+      }
+
       const data = await response.json();
-      return JSON.parse(data.candidates[0].content.parts[0].text) as MetaphysicResult;
+      const rawText = data.candidates[0].content.parts[0].text;
+      return JSON.parse(rawText) as MetaphysicResult;
     } catch (e: any) {
-      console.error("Engine Critical Error:", e);
+      // 僅印出 message，不印出整個錯誤對象以防洩漏
+      console.error("Engine Safe Error Handler:", e.message);
       throw e;
     }
   }
