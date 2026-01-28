@@ -1,8 +1,3 @@
-/**
- * 🛠️ 2026 算命仙等級引擎
- * 整合：東方命理、西方數理、關係共振、綜合決策
- */
-
 export interface MetaphysicResult {
   personal: {
     eastern: {
@@ -37,14 +32,11 @@ export class MetaphysicalEngine {
     user: { name: string; birthday: string }, 
     partner?: { name: string; birthday: string }
   ): Promise<MetaphysicResult> {
-    
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    const MODEL_ID = "gemini-3-flash-preview"; 
+    const MODEL_ID = "gemini-1.5-flash"; 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
-
     const isRel = !!(partner && partner.name);
     
-    // 注入「算命仙」級別的深度 Prompt
     const prompt = `你是一位精通東西方玄學的核心 AI Aetheris，目前時間是 2026 年。
     請對以下對象進行「算命仙」等級的深度解析：
     用戶：${user.name}，生日：${user.birthday}。
