@@ -39,7 +39,7 @@ export class MetaphysicalEngine {
     const MODEL_ID = "gemini-1.5-flash";
     const isRel = !!(partner && partner.name);
     
-    // 遍歷不同的 API 版本以確保相容性
+    // 遍歷不同的 API 版本以確保相容
     const apiVersions = ['v1beta', 'v1'];
     let lastError = "";
 
