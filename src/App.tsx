@@ -1,37 +1,12 @@
 import React, { useState } from 'react';
 import { MetaphysicalEngine, MetaphysicResult } from './services/metaphysicalEngine';
 
-// --- UI 組件：高質感卡片 ---
-function GlassCard({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-white/[0.03] border border-white/[0.08] backdrop-blur-3xl rounded-[2.5rem] p-8 shadow-2xl ${className}`}>
-      <h3 className="text-[10px] font-black tracking-[0.3em] text-indigo-400 uppercase mb-6 italic">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-// --- 小型組件：數據標籤 ---
 function DataTag({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold mb-1">{label}</span>
+      <span className="text-[9px] uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-1">{label}</span>
       <span className="text-sm font-bold text-slate-200">{value || '---'}</span>
-      {sub && <span className="text-[9px] text-indigo-400/70 mt-1">{sub}</span>}
-    </div>
-  );
-}
-
-// --- 九宮格組件 ---
-function LoShuGrid({ grid }: { grid: number[] }) {
-  const layout = [4, 9, 2, 3, 5, 7, 8, 1, 6];
-  return (
-    <div className="grid grid-cols-3 gap-1.5 w-24">
-      {layout.map((num) => (
-        <div key={num} className={`h-7 w-7 flex items-center justify-center text-[10px] rounded-lg border transition-all duration-700 ${grid && grid[num] > 0 ? 'bg-indigo-500/30 border-indigo-400/50 text-white font-bold shadow-[0_0_12px_rgba(99,102,241,0.2)]' : 'border-white/5 text-white/5'}`}>
-          {num}
-        </div>
-      ))}
+      {sub && <span className="text-[10px] text-slate-500 mt-1">{sub}</span>}
     </div>
   );
 }
@@ -43,174 +18,109 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
-  // 🔥 核心修正：年份封鎖與格式化邏輯
-  const handleDateInput = (val: string, target: 'user' | 'partner') => {
-    // 1. 自動將斜線轉為橫線 2. 只允許數字與橫線 3. 限制長度 10 位 (YYYY-MM-DD)
-    const cleanVal = val.replace(/\//g, '-').replace(/[^0-9-]/g, '').slice(0, 10);
-    
-    if (target === 'user') setUser(prev => ({ ...prev, birthday: cleanVal }));
-    else setPartner(prev => ({ ...prev, birthday: cleanVal }));
-  };
-
   const handleStartAnalysis = async () => {
-    if (!user.name || user.birthday.length < 10) {
-      return alert("請填寫姓名與完整生日 (格式: 1980-10-29)");
-    }
-
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      return alert("API Key 未配置。請在 Vercel Settings 設定 VITE_GEMINI_API_KEY 並重新部署。");
-    }
-
+    if (!user.name || !user.birthday) return alert("請輸入姓名與生日");
     setIsLoading(true);
     try {
-      const result = await MetaphysicalEngine.getFullAnalysis(
-        user, 
-        mode === 'relationship' ? partner : undefined
-      );
+      const apiUser = { ...user, birthday: user.birthday.replace(/\//g, '-') };
+      const apiPartner = mode === 'relationship' ? { ...partner, birthday: partner.birthday.replace(/\//g, '-') } : undefined;
+      const result = await MetaphysicalEngine.getFullAnalysis(apiUser, apiPartner);
       setData(result);
     } catch (e: any) {
-      // 針對常見 API 錯誤進行攔截提示
-      if (e.message.includes('403')) {
-        alert("🚨 維度連結受阻 (403)：API Key 已失效或被標記為洩漏，請更換新 Key。");
-      } else if (e.message.includes('400')) {
-        alert("🚨 格式錯誤 (400)：請確認輸入的資料是否符合規範。");
-      } else {
-        alert("分析失敗：" + e.message);
-      }
+      alert("連線失敗：" + e.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020205] text-slate-200 pb-24 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
-      {/* 背景裝飾光暈 */}
-      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/20 blur-[150px] rounded-full pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-pink-900/10 blur-[150px] rounded-full pointer-events-none"></div>
-
-      <header className="relative pt-24 pb-16 text-center">
-        <h1 className="text-6xl font-black tracking-[0.5em] text-white italic drop-shadow-2xl">AETHERIS</h1>
-        <p className="text-[11px] text-indigo-400 tracking-[0.6em] uppercase mt-6 font-medium opacity-60">Metaphysical Intelligence OS</p>
+    <div className="min-h-screen bg-[#020205] text-white p-6 pb-24 font-sans selection:bg-indigo-500/30">
+      {/* 背景裝飾 */}
+      <div className="fixed top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,1)_0%,rgba(2,2,5,1)_100%)] -z-10"></div>
+      
+      <header className="pt-20 pb-12 text-center">
+        <h1 className="text-6xl font-black tracking-[0.6em] italic text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-400 to-white">AETHERIS</h1>
+        <p className="text-[10px] text-indigo-500 tracking-[0.8em] mt-6 uppercase opacity-70">Metaphysical Intelligence OS</p>
       </header>
 
-      <main className="max-w-xl mx-auto px-6 relative z-10 space-y-12">
-        {/* 輸入卡片 */}
-        <div className="bg-white/[0.02] border border-white/[0.08] rounded-[3rem] p-10 backdrop-blur-2xl shadow-2xl">
+      <main className="max-w-xl mx-auto space-y-10">
+        {/* 輸入介面 */}
+        <div className="bg-white/[0.02] border border-white/10 rounded-[3rem] p-10 backdrop-blur-3xl shadow-2xl">
           <div className="flex bg-black/40 p-1.5 rounded-2xl mb-8">
-            <button 
-              onClick={() => { setMode('personal'); setData(null); }} 
-              className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500'}`}
-            >
-              個人鑑定
-            </button>
-            <button 
-              onClick={() => { setMode('relationship'); setData(null); }} 
-              className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500'}`}
-            >
-              雙人共振
-            </button>
+            <button onClick={() => setMode('personal')} className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>個人鑑定</button>
+            <button onClick={() => setMode('relationship')} className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 text-white' : 'text-slate-500'}`}>雙人共振</button>
           </div>
-
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <input 
-                type="text" 
-                placeholder="您的姓名" 
-                value={user.name} 
-                onChange={(e) => setUser({...user, name: e.target.value})} 
-                className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white" 
-              />
-              <input 
-                type="text" 
-                placeholder="生日 (YYYY-MM-DD)" 
-                value={user.birthday} 
-                onChange={(e) => handleDateInput(e.target.value, 'user')} 
-                className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white placeholder:text-slate-600" 
-              />
-            </div>
-
+          <div className="space-y-4">
+            <input type="text" placeholder="姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 transition-all" />
+            <input type="text" placeholder="生日 (1980/10/29)" value={user.birthday} onChange={(e)=>setUser({...user, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 transition-all" />
+            
             {mode === 'relationship' && (
-              <div className="pt-6 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-4">
-                <input 
-                  type="text" 
-                  placeholder="對象姓名" 
-                  value={partner.name} 
-                  onChange={(e) => setPartner({...partner, name: e.target.value})} 
-                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" 
-                />
-                <input 
-                  type="text" 
-                  placeholder="對象生日 (YYYY-MM-DD)" 
-                  value={partner.birthday} 
-                  onChange={(e) => handleDateInput(e.target.value, 'partner')} 
-                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white placeholder:text-slate-600" 
-                />
+              <div className="pt-4 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-4">
+                <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 outline-none focus:border-pink-500 transition-all" />
+                <input type="text" placeholder="對象生日" value={partner.birthday} onChange={(e)=>setPartner({...partner, birthday:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 outline-none focus:border-pink-500 transition-all" />
               </div>
             )}
-
-            <button 
-              onClick={handleStartAnalysis} 
-              disabled={isLoading} 
-              className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[10px] transition-all duration-500 shadow-2xl ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} disabled:opacity-20 active:scale-95`}
-            >
+            
+            <button onClick={handleStartAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[11px] transition-all shadow-2xl ${mode === 'personal' ? 'bg-indigo-600' : 'bg-pink-600'} disabled:opacity-20`}>
               {isLoading ? "SYNCHRONIZING..." : "INITIATE ANALYSIS"}
             </button>
           </div>
         </div>
 
-        {/* 結果顯示 */}
+        {/* 結果展示 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-            {/* 每日建議 */}
-            <div className="bg-gradient-to-r from-indigo-500/10 via-pink-500/10 to-transparent border border-white/10 rounded-[3rem] p-10 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
-              <p className="text-[10px] font-black tracking-[0.5em] text-indigo-400 mb-6 uppercase italic">Daily Insight</p>
-              <p className="text-xl leading-relaxed text-slate-200 font-serif italic">"{data.dailyAdvice}"</p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                {data.luckyIndicators?.action?.map((a: string, i: number) => (
-                  <span key={i} className="px-4 py-1.5 bg-white/5 rounded-full text-[9px] font-bold text-slate-400 border border-white/5">宜：{a}</span>
-                ))}
+            
+            {/* 1. 今日決策區 (補全) */}
+            <div className="bg-gradient-to-br from-indigo-900/40 to-transparent border border-indigo-500/30 rounded-[3rem] p-10 backdrop-blur-3xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10 text-6xl italic font-black">2026</div>
+              <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-6">Daily Strategic Decision</h3>
+              <p className="text-2xl font-serif italic text-white mb-8 leading-relaxed">"{data.dailyAdvice}"</p>
+              
+              <div className="grid grid-cols-3 gap-6 pt-8 border-t border-white/10">
+                <DataTag label="幸運色" value={data.luckyIndicators.color} />
+                <DataTag label="幸運方位" value={data.luckyIndicators.direction} />
+                <div className="col-span-1">
+                   <span className="text-[9px] uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-2 block">今日宜</span>
+                   <div className="flex flex-wrap gap-2">
+                     {data.luckyIndicators.action.map((act, i) => (
+                       <span key={i} className="text-[10px] bg-indigo-500/20 text-indigo-200 px-2 py-1 rounded-md border border-indigo-500/30">{act}</span>
+                     ))}
+                   </div>
+                </div>
               </div>
             </div>
 
+            {/* 2. 玄學細節區 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 東方玄學 */}
-              <GlassCard title="Eastern Metaphysics">
-                <div className="space-y-6">
-                  <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用神：${data.personal.eastern.bazi.favorable}`} />
-                  <DataTag label="姓名學-五格" value={`總格 ${data.personal.eastern.nameAnalysis.fiveGrids.total} - ${data.personal.eastern.nameAnalysis.luck81}`} sub={`三才：${data.personal.eastern.nameAnalysis.threeTalents}`} />
-                  <p className="text-[10px] leading-relaxed text-slate-400 italic line-clamp-3">{data.personal.eastern.bazi.analysis}</p>
-                </div>
-              </GlassCard>
-
-              {/* 西方能量 */}
-              <GlassCard title="Western Energy">
-                <div className="space-y-6">
-                  <div className="flex justify-between items-start">
-                    <DataTag label="生命靈數" value={data.personal.western.numerology.lifeNum} sub={data.personal.western.numerology.personalYear} />
-                    <LoShuGrid grid={data.personal.western.numerology.grid} />
-                  </div>
-                  <DataTag label="人類圖類型" value={data.personal.western.humanDesign.type} sub={`權威：${data.personal.western.humanDesign.authority}`} />
-                  <DataTag label="卓爾金曆" value={data.personal.western.tzolkin.kin} sub={`波符：${data.personal.western.tzolkin.wave}`} />
-                </div>
-              </GlassCard>
+              <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 space-y-6">
+                <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Eastern</h3>
+                <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用：${data.personal.eastern.bazi.favorable}`} />
+                <DataTag label="姓名五格" value={`總格 ${data.personal.eastern.nameAnalysis.fiveGrids.total}`} sub={data.personal.eastern.nameAnalysis.luck81} />
+              </div>
+              
+              <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 space-y-6">
+                <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Western</h3>
+                <DataTag label="人類圖" value={data.personal.western.humanDesign.type} sub={data.personal.western.humanDesign.authority} />
+                <DataTag label="生命靈數" value={`主命數 ${data.personal.western.numerology.lifeNum}`} sub={`個人年：${data.personal.western.numerology.personalYear}`} />
+              </div>
             </div>
 
-            {/* 關係分析 */}
+            {/* 3. 關係共振區 (僅在雙人模式顯示) */}
             {mode === 'relationship' && data.relationship && (
-              <GlassCard title="Relationship Synergy" className="bg-gradient-to-br from-pink-500/10 to-indigo-500/5">
+              <div className="bg-gradient-to-r from-pink-900/20 to-indigo-900/20 border border-pink-500/30 rounded-[3rem] p-10">
                 <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <span className="text-5xl font-black text-white">{data.relationship.syncScore}%</span>
-                    <p className="text-[10px] text-pink-400 font-bold mt-2 uppercase tracking-widest">{data.relationship.harmony}</p>
+                  <h3 className="text-[10px] font-black tracking-widest text-pink-400 uppercase">Resonance</h3>
+                  <span className="text-4xl font-black italic">{data.relationship.syncScore}%</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <DataTag label="和諧程度" value={data.relationship.harmony} />
+                  <DataTag label="溝通建議" value={data.relationship.communicationTone} />
+                  <div className="col-span-full bg-black/40 p-4 rounded-2xl border border-white/5">
+                    <p className="text-xs text-pink-200/70 leading-relaxed"><span className="text-pink-500 font-bold">預警：</span>{data.relationship.warning}</p>
                   </div>
                 </div>
-                <div className="p-4 bg-black/40 rounded-2xl border border-white/5 space-y-2">
-                  <p className="text-[9px] font-bold text-indigo-300">溝通建議：{data.relationship.communicationTone}</p>
-                  <p className="text-[9px] font-bold text-pink-500">雷區：{data.relationship.warning}</p>
-                </div>
-              </GlassCard>
+              </div>
             )}
           </div>
         )}
