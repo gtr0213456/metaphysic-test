@@ -6,7 +6,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const { user, partner } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY; // 🔒 從 Vercel 環境變數安全讀取
+  const apiKey = process.env.GEMINI_API_KEY; // 🔒 從 Vercel 環境變數安全讀
 
   if (!apiKey) {
     return res.status(500).json({ error: "伺服器 API Key 配置缺失" });
