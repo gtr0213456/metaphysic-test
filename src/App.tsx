@@ -43,38 +43,41 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'personal' | 'relationship'>('personal');
 
-  // 🔥 核心修正：年份 4 位限制邏輯 (已修正語法錯誤)
-  const handleDateChange = (val: string, target: 'user' | 'partner') => {
-    if (!val) {
-      if (target === 'user') setUser(prev => ({ ...prev, birthday: "" }));
-      else setPartner(prev => ({ ...prev, birthday: "" }));
-      return;
-    }
-
-    const parts = val.split('-');
-    const year = parts[0];
-
-    if (year && year.length > 4) {
-      const correctedDate = `${year.slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
-      if (target === 'user') setUser(prev => ({ ...prev, birthday: correctedDate }));
-      else setPartner(prev => ({ ...prev, birthday: correctedDate })); // ✅ 此處括號已補齊
-    } else {
-      if (target === 'user') setUser(prev => ({ ...prev, birthday: val }));
-      else setPartner(prev => ({ ...prev, birthday: val }));
-    }
+  // 🔥 核心修正：年份封鎖與格式化邏輯
+  const handleDateInput = (val: string, target: 'user' | 'partner') => {
+    // 1. 自動將斜線轉為橫線 2. 只允許數字與橫線 3. 限制長度 10 位 (YYYY-MM-DD)
+    const cleanVal = val.replace(/\//g, '-').replace(/[^0-9-]/g, '').slice(0, 10);
+    
+    if (target === 'user') setUser(prev => ({ ...prev, birthday: cleanVal }));
+    else setPartner(prev => ({ ...prev, birthday: cleanVal }));
   };
 
   const handleStartAnalysis = async () => {
-    if (!user.name || !user.birthday) return alert("請填寫您的姓名與生日");
+    if (!user.name || user.birthday.length < 10) {
+      return alert("請填寫姓名與完整生日 (格式: 1980-10-29)");
+    }
+
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) return alert("API Key 未配置");
+    if (!apiKey) {
+      return alert("API Key 未配置。請在 Vercel Settings 設定 VITE_GEMINI_API_KEY 並重新部署。");
+    }
 
     setIsLoading(true);
     try {
-      const result = await MetaphysicalEngine.getFullAnalysis(user, mode === 'relationship' ? partner : undefined);
+      const result = await MetaphysicalEngine.getFullAnalysis(
+        user, 
+        mode === 'relationship' ? partner : undefined
+      );
       setData(result);
     } catch (e: any) {
-      alert("連結失敗：" + e.message);
+      // 針對常見 API 錯誤進行攔截提示
+      if (e.message.includes('403')) {
+        alert("🚨 維度連結受阻 (403)：API Key 已失效或被標記為洩漏，請更換新 Key。");
+      } else if (e.message.includes('400')) {
+        alert("🚨 格式錯誤 (400)：請確認輸入的資料是否符合規範。");
+      } else {
+        alert("分析失敗：" + e.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +85,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#020205] text-slate-200 pb-24 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+      {/* 背景裝飾光暈 */}
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-900/20 blur-[150px] rounded-full pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-pink-900/10 blur-[150px] rounded-full pointer-events-none"></div>
 
@@ -91,43 +95,74 @@ export default function App() {
       </header>
 
       <main className="max-w-xl mx-auto px-6 relative z-10 space-y-12">
+        {/* 輸入卡片 */}
         <div className="bg-white/[0.02] border border-white/[0.08] rounded-[3rem] p-10 backdrop-blur-2xl shadow-2xl">
           <div className="flex bg-black/40 p-1.5 rounded-2xl mb-8">
-            <button onClick={() => { setMode('personal'); setData(null); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500'}`}>個人鑑定</button>
-            <button onClick={() => { setMode('relationship'); setData(null); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500'}`}>雙人共振</button>
+            <button 
+              onClick={() => { setMode('personal'); setData(null); }} 
+              className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'personal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500'}`}
+            >
+              個人鑑定
+            </button>
+            <button 
+              onClick={() => { setMode('relationship'); setData(null); }} 
+              className={`flex-1 py-3 rounded-xl text-[10px] font-bold tracking-widest transition-all ${mode === 'relationship' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500'}`}
+            >
+              雙人共振
+            </button>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <input type="text" placeholder="您的姓名" value={user.name} onChange={(e)=>setUser({...user, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white" />
               <input 
-                type="date" 
-                max="9999-12-31" 
+                type="text" 
+                placeholder="您的姓名" 
+                value={user.name} 
+                onChange={(e) => setUser({...user, name: e.target.value})} 
+                className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white" 
+              />
+              <input 
+                type="text" 
+                placeholder="生日 (YYYY-MM-DD)" 
                 value={user.birthday} 
-                onChange={(e) => handleDateChange(e.target.value, 'user')} 
-                className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-slate-400" 
+                onChange={(e) => handleDateInput(e.target.value, 'user')} 
+                className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500/50 transition-all text-white placeholder:text-slate-600" 
               />
             </div>
+
             {mode === 'relationship' && (
               <div className="pt-6 border-t border-white/5 space-y-4 animate-in fade-in slide-in-from-top-4">
-                <input type="text" placeholder="對象姓名" value={partner.name} onChange={(e)=>setPartner({...partner, name:e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" />
                 <input 
-                  type="date" 
-                  max="9999-12-31" 
+                  type="text" 
+                  placeholder="對象姓名" 
+                  value={partner.name} 
+                  onChange={(e) => setPartner({...partner, name: e.target.value})} 
+                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" 
+                />
+                <input 
+                  type="text" 
+                  placeholder="對象生日 (YYYY-MM-DD)" 
                   value={partner.birthday} 
-                  onChange={(e) => handleDateChange(e.target.value, 'partner')} 
-                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-slate-400" 
+                  onChange={(e) => handleDateInput(e.target.value, 'partner')} 
+                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white placeholder:text-slate-600" 
                 />
               </div>
             )}
-            <button onClick={handleStartAnalysis} disabled={isLoading} className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[10px] transition-all duration-500 shadow-2xl ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} disabled:opacity-20 active:scale-95`}>
+
+            <button 
+              onClick={handleStartAnalysis} 
+              disabled={isLoading} 
+              className={`w-full py-5 rounded-2xl font-black tracking-[0.5em] text-[10px] transition-all duration-500 shadow-2xl ${mode === 'personal' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-pink-600 hover:bg-pink-500'} disabled:opacity-20 active:scale-95`}
+            >
               {isLoading ? "SYNCHRONIZING..." : "INITIATE ANALYSIS"}
             </button>
           </div>
         </div>
 
+        {/* 結果顯示 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+            {/* 每日建議 */}
             <div className="bg-gradient-to-r from-indigo-500/10 via-pink-500/10 to-transparent border border-white/10 rounded-[3rem] p-10 relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
               <p className="text-[10px] font-black tracking-[0.5em] text-indigo-400 mb-6 uppercase italic">Daily Insight</p>
@@ -140,6 +175,7 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 東方玄學 */}
               <GlassCard title="Eastern Metaphysics">
                 <div className="space-y-6">
                   <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用神：${data.personal.eastern.bazi.favorable}`} />
@@ -148,6 +184,7 @@ export default function App() {
                 </div>
               </GlassCard>
 
+              {/* 西方能量 */}
               <GlassCard title="Western Energy">
                 <div className="space-y-6">
                   <div className="flex justify-between items-start">
@@ -160,6 +197,7 @@ export default function App() {
               </GlassCard>
             </div>
 
+            {/* 關係分析 */}
             {mode === 'relationship' && data.relationship && (
               <GlassCard title="Relationship Synergy" className="bg-gradient-to-br from-pink-500/10 to-indigo-500/5">
                 <div className="flex justify-between items-end mb-8">
