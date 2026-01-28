@@ -39,7 +39,7 @@ export class MetaphysicalEngine {
     const MODEL_ID = "gemini-1.5-flash";
     const isRel = !!(partner && partner.name);
     
-    // 💡 備選路徑方案：有些新 Key 在 v1beta 會報 404，但在 v1 卻正常
+    // 遍歷不同的 API 版本以確保相容性
     const apiVersions = ['v1beta', 'v1'];
     let lastError = "";
 
@@ -57,7 +57,11 @@ export class MetaphysicalEngine {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { response_mime_type: "application/json", temperature: 0.75 }
+            generationConfig: { 
+              // 🔥 這裡必須是 responseMimeType，不可使用底線命名
+              responseMimeType: "application/json", 
+              temperature: 0.75 
+            }
           })
         });
 
@@ -67,7 +71,7 @@ export class MetaphysicalEngine {
           return JSON.parse(rawText) as MetaphysicResult;
         }
 
-        // 捕捉 404，嘗試下一個版本
+        // 讀取錯誤詳情但不噴出 URL
         const errorData = await response.json().catch(() => ({}));
         lastError = errorData.error?.message || `Status ${response.status}`;
         
@@ -76,8 +80,8 @@ export class MetaphysicalEngine {
       }
     }
 
-    // 如果所有版本都失敗，統一拋出錯誤，且「絕對不印出」包含 Key 的原始 Error
-    console.error("Engine Blocked a potential leak. Error info:", lastError);
-    throw new Error(`維度連結中斷: ${lastError}。請確認 Google AI Studio 專案已啟用且 Key 有效。`);
+    // 🔴 這裡攔截所有錯誤，防止瀏覽器在 Console 噴出帶 Key 的原始報錯網址
+    console.error("Engine Safe Error Handler:", lastError);
+    throw new Error(`維度連結中斷: ${lastError}`);
   }
 }
