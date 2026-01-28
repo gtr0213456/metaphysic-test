@@ -36,21 +36,21 @@ export class MetaphysicalEngine {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) throw new Error("環境變數 VITE_GEMINI_API_KEY 未配置");
 
-    const MODEL_ID = "gemini-1.5-flash";
+    // 💡 嘗試最穩定的模型順序
+    const MODEL_CANDIDATES = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash-exp"];
     const isRel = !!(partner && partner.name);
     
-    // 遍歷不同的 API 版本以確保相容
-    const apiVersions = ['v1beta', 'v1'];
-    let lastError = "";
-
     const prompt = `你是一位精通東西方玄學的核心 AI Aetheris。
     用戶：${user.name}，生日：${user.birthday}。
     ${isRel ? `合盤對象：${partner?.name}，生日：${partner?.birthday}。` : ""}
     要求：嚴格輸出 JSON 格式，包含八字、紫微、姓名學、人類圖、生命靈數、卓爾金曆、關係合盤與今日宜忌。`;
 
-    for (const version of apiVersions) {
+    let lastError = "";
+
+    for (const modelId of MODEL_CANDIDATES) {
       try {
-        const API_URL = `https://generativelanguage.googleapis.com/${version}/models/${MODEL_ID}:generateContent?key=${apiKey}`;
+        // 固定使用 v1beta，因為只有它支援 responseMimeType
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
         
         const response = await fetch(API_URL, {
           method: "POST",
@@ -58,9 +58,8 @@ export class MetaphysicalEngine {
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { 
-              // 🔥 這裡必須是 responseMimeType，不可使用底線命名
-              responseMimeType: "application/json", 
-              temperature: 0.75 
+              responseMimeType: "application/json", // 必須是小駝峰
+              temperature: 0.8 
             }
           })
         });
@@ -71,17 +70,20 @@ export class MetaphysicalEngine {
           return JSON.parse(rawText) as MetaphysicResult;
         }
 
-        // 讀取錯誤詳情但不噴出 URL
         const errorData = await response.json().catch(() => ({}));
         lastError = errorData.error?.message || `Status ${response.status}`;
         
+        // 如果是 404 則嘗試下一個模型 ID
+        if (response.status === 404) continue;
+        else break; 
+
       } catch (e: any) {
         lastError = e.message;
       }
     }
 
-    // 🔴 這裡攔截所有錯誤，防止瀏覽器在 Console 噴出帶 Key 的原始報錯網址
-    console.error("Engine Safe Error Handler:", lastError);
+    // 🔴 攔截報錯，保護 API Key 不被瀏覽器噴出
+    console.error("Engine Safe Error:", lastError);
     throw new Error(`維度連結中斷: ${lastError}`);
   }
 }
