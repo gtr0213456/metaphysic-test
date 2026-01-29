@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. CORS 設置
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -15,31 +14,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { user, partner } = req.body;
 
-  // 💡 關鍵：給予極其嚴格的格式範例
-  const formatExample = {
-    personal: {
-      eastern: {
-        bazi: { pillars: ["甲子", "乙丑", "丙寅", "丁卯"], strength: "中和", favorable: "水木", analysis: "..." },
-        ziwei: { mainStars: "紫微天府", palace: "命宮", luck: "大吉" },
-        nameAnalysis: { strokes: 25, fiveGrids: { heaven: 10, man: 15, earth: 10, out: 5, total: 25 }, luck81: "吉", threeTalents: "平" }
-      },
-      western: {
-        humanDesign: { type: "生產者", authority: "薦骨", strategy: "等待回應", profile: "4/6", channels: ["10-57"] },
-        numerology: { lifeNum: 7, grid: [1, 2, 3], arrows: ["123"], personalYear: "2026" },
-        tzolkin: { kin: "Kin 1", totem: "紅龍", tone: "磁性", wave: "紅龍波" }
-      }
-    },
-    dailyAdvice: "宜專注",
-    luckyIndicators: { color: "紅色", direction: "東方", action: ["閱讀", "冥想"] }
-  };
-
-  const prompt = `你是一位精通東西方玄學的核心 AI Aetheris。
-    用戶：${user.name}，生日：${user.birthday}。
+  // 💡 強化 Prompt：要求 AI 展現大師風範，增加分析細節
+  const prompt = `你是一位融合東西方命理精髓、語氣高冷且精準的玄學 AI 導師 Aetheris。
+    用戶資訊：${user.name}，生日：${user.birthday}。
     ${partner?.name ? `合盤對象：${partner.name}，生日：${partner.birthday}。` : ""}
-    要求：你必須「嚴格」按照以下 JSON 結構輸出分析結果，不可增減欄位：
-    ${JSON.stringify(formatExample)}
+
+    請針對以上資訊進行深度運算，並嚴格按以下 JSON 格式輸出。每個分析欄位請提供具備「專業度」與「文學感」的描述（約 50-100 字）：
+
+    {
+      "personal": {
+        "eastern": {
+          "bazi": { "pillars": ["年柱", "月柱", "日柱", "時柱"], "strength": "身強/身弱描述", "favorable": "喜用神", "analysis": "針對八字格局的深度事業與命運分析..." },
+          "ziwei": { "mainStars": "主星名稱", "palace": "命宮位置", "luck": "流年運勢詳細解析..." },
+          "nameAnalysis": { "strokes": 總筆劃, "fiveGrids": {"heaven":1, "man":1, "earth":1, "out":1, "total":1}, "luck81": "靈動數解析", "threeTalents": "三才配置對健康的影響..." }
+        },
+        "western": {
+          "humanDesign": { "type": "類型", "authority": "權威", "strategy": "策略", "profile": "角色", "channels": ["通道1", "通道2"], "analysis": "針對能量中心與通道的深度靈魂藍圖解析..." },
+          "numerology": { "lifeNum": 數字, "grid": [1,2,3], "arrows": ["連線"], "personalYear": "今年流年解析..." },
+          "tzolkin": { "kin": "Kin號", "totem": "圖騰", "tone": "調性", "wave": "波符", "analysis": "瑪雅曆靈性指引..." }
+        }
+      },
+      "dailyAdvice": "今日的戰略性建議，語氣要優雅且神祕...",
+      "luckyIndicators": { "color": "建議色", "direction": "吉方", "action": ["具體建議行動1", "具體建議行動2"] }
+    }
     
-    請直接回傳 JSON 物件，不要有任何 Markdown 標籤或解釋。`;
+    注意：僅輸出 JSON，嚴禁任何標題或 Markdown。`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -51,10 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "You are a metaphysics expert. Output ONLY raw JSON." },
+          { role: "system", content: "You are Aetheris, a professional metaphysics AI. Always respond in valid JSON." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.5, // 降低隨機性，讓格式更穩定
+        temperature: 0.6,
         response_format: { type: "json_object" }
       })
     });
@@ -62,22 +61,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message });
 
-    let content = data.choices[0]?.message?.content;
-    
-    // 雙重保險：如果 AI 還是吐了 Markdown
-    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    const parsedData = JSON.parse(content);
-
-    // 🛑 最終檢查：如果缺少關鍵欄位，補上預設值防止前端噴錯
-    if (!parsedData.luckyIndicators) {
-      parsedData.luckyIndicators = { color: "未知", direction: "未知", action: [] };
-    }
-
-    return res.status(200).json(parsedData);
+    const content = data.choices[0]?.message?.content;
+    return res.status(200).json(JSON.parse(content));
 
   } catch (err: any) {
-    console.error("解析失敗:", err.message);
-    return res.status(500).json({ error: '數據解析異常，請再試一次' });
+    return res.status(500).json({ error: '維度連結超時，請重試' });
   }
 }
