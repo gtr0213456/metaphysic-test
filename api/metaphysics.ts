@@ -1,8 +1,8 @@
-// 檔案路徑務必確保在：專案根目錄/api/metaphysics.ts
+// 檔案路徑：/api/metaphysics.ts (必須在專案根目錄的 api 資料夾內)
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. 只允許 POST 請求
+  // 1. 限制 POST 請求
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: "API Key 缺失，請檢查 Vercel 環境變數" });
+    return res.status(500).json({ error: "Vercel 環境變數 GEMINI_API_KEY 未設定" });
   }
 
   const isRel = !!(partner && partner.name);
@@ -21,11 +21,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     要求：嚴格輸出 JSON 格式。包含八字、紫微、姓名學、人類圖、生命靈數、卓爾金曆、關係合盤與今日宜忌。
     Respond only with valid JSON. Do not include markdown or explanations.`;
 
-  /** * 💡 呼叫 Gemini 的共用函式 
-   * 使用 v1beta 搭配 URL Key 是目前對 1.5 系列相容性最好的方式
+  /** * 💡 備援呼叫機制：嘗試不同的模型 ID 以應對 Google 的區域限制
    */
-  async function callGemini(model: string, signal: AbortSignal) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  async function callGemini(modelId: string, signal: AbortSignal) {
+    // 使用 v1beta 端點，這是目前對 Flash 模型相容性最好的路徑
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    
     return fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,43 +42,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // ⏳ 25 秒超時保護（配合 Vercel 免費版限制）
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25秒超時保護
 
-    // 🚀 策略：先嘗試 Flash，若失敗自動切換到 Pro
-    let googleResponse = await callGemini("gemini-1.5-flash", controller.signal);
+    // 🚀 優先嘗試 gemini-1.5-flash
+    let response = await callGemini("gemini-1.5-flash", controller.signal);
 
-    // 如果 1.5-flash 報 404 (找不到模型) 或 5xx (伺服器錯誤)，嘗試備援模型
-    if (!googleResponse.ok && (googleResponse.status === 404 || googleResponse.status >= 500)) {
-      console.warn("Flash 模型不可用，切換 gemini-pro 備援");
-      googleResponse = await callGemini("gemini-pro", controller.signal);
+    // 🔁 如果 1.5-flash 報 404 (Not Found)，自動嘗試 gemini-pro
+    if (!response.ok && response.status === 404) {
+      console.warn("Flash 模型找不到，切換 gemini-pro...");
+      response = await callGemini("gemini-pro", controller.signal);
     }
 
     clearTimeout(timeout);
+    const data = await response.json();
 
-    const data = await googleResponse.json();
-
-    if (!googleResponse.ok) {
-      return res.status(googleResponse.status).json({
-        error: `Gemini API 報錯: ${data.error?.message || "未知錯誤"}`
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Google API 錯誤: ${data.error?.message || "未知錯誤"}`
       });
     }
 
+    // 🛑 檢查內容是否被安全過濾器攔截
     const candidate = data.candidates?.[0];
-    
-    // 🛑 安全政策攔截處理
     if (candidate?.finishReason === "SAFETY") {
-      return res.status(403).json({ error: "內容因觸發安全過濾器被攔截" });
+      return res.status(403).json({ error: "內容因安全政策被攔截，請調整輸入內容" });
     }
 
     const rawText = candidate?.content?.parts?.[0]?.text;
+    if (!rawText) return res.status(502).json({ error: "模型未回傳有效文字" });
 
-    if (!rawText) {
-      return res.status(502).json({ error: "模型未回傳有效內容" });
-    }
-
-    // 🧹 ChatGPT 建議的強力 JSON 抽取與補括號邏輯
+    /** 🧹 強力 JSON 抽取與補括號邏輯 (確保格式絕對正確) */
     const extractJson = (text: string) => {
       const start = text.indexOf("{");
       const end = text.lastIndexOf("}");
@@ -90,22 +85,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return close < open ? text + "}".repeat(open - close) : text;
     };
 
-    const clean = fixBrackets(
+    const cleanJsonStr = fixBrackets(
       extractJson(rawText.replace(/```json/g, "").replace(/```/g, "").trim())
     );
 
     try {
-      const parsed = JSON.parse(clean);
+      const parsed = JSON.parse(cleanJsonStr);
       return res.status(200).json(parsed);
     } catch (parseErr) {
-      console.error("JSON 解析失敗:", rawText);
-      return res.status(500).json({ error: "數據格式損毀", raw: rawText });
+      return res.status(500).json({ error: "JSON 解析失敗", raw: rawText });
     }
 
   } catch (err: any) {
-    if (err.name === "AbortError") {
-      return res.status(504).json({ error: "運算超時，請重試" });
-    }
+    if (err.name === "AbortError") return res.status(504).json({ error: "連線超時，請重試" });
     return res.status(500).json({ error: "伺服器錯誤: " + err.message });
   }
 }
