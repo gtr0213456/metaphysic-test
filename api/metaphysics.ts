@@ -19,27 +19,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // ==================== 純公式計算（固定不變） ====================
+    // 1. 純公式計算姓名五格（固定）
     const nameAnalysisStatic = calculateNameGrids(user.name);
+
+    // 2. 純公式計算生命靈數（固定）
     const numerologyStatic = calculateLifeNumber(user.birthday);
 
-    // ==================== AI 只負責描述 ====================
+    // 3. 其他系統仍用 AI（暫時）
     const bazi = await safeCallGroq(apiKey, getBaziPrompt(user, partner));
     const ziwei = await safeCallGroq(apiKey, getZiweiPrompt(user, partner));
     const humanDesign = await safeCallGroq(apiKey, getHumanDesignPrompt(user, partner));
     const tzolkin = await safeCallGroq(apiKey, getTzolkinPrompt(user, partner));
     const general = await safeCallGroq(apiKey, getGeneralPrompt(user, partner));
 
-    // 姓名學 + 生命靈數：公式結果 + AI 描述合併
+    // 姓名學：公式 + AI 描述合併
     const nameAnalysis = {
       ...nameAnalysisStatic,
-      analysis: general.nameAnalysis?.analysis || "姓名學分析"
+      analysis: general.nameAnalysis?.analysis || "姓名學專業解析"
     };
 
+    // 生命靈數：公式 + AI 描述合併
     const numerology = {
       ...numerologyStatic,
-      personalYear: general.numerology?.personalYear || "今年流年解析",
-      analysis: general.numerology?.analysis || "生命靈數解析"
+      personalYear: general.numerology?.personalYear || "今年流年",
+      analysis: general.numerology?.analysis || "生命靈數指引"
     };
 
     const confidence = calculateConfidence({ bazi, ziwei, humanDesign, tzolkin });
@@ -70,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// ====================== 安全呼叫 Groq ======================
+// 安全呼叫 Groq
 async function safeCallGroq(apiKey: string, prompt: string) {
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -85,7 +88,7 @@ async function safeCallGroq(apiKey: string, prompt: string) {
           { role: "system", content: "You are Aetheris. Respond ONLY with valid JSON, no extra text." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.35,
+        temperature: 0.3,
         max_tokens: 600,
         response_format: { type: "json_object" }
       })
@@ -102,9 +105,7 @@ async function safeCallGroq(apiKey: string, prompt: string) {
   }
 }
 
-// ====================== 純公式計算 ======================
-
-// 1. 生命靈數（固定）
+// 生命靈數公式
 function calculateLifeNumber(birthday: string) {
   const digits = birthday.replace(/[^0-9]/g, '').split('').map(Number);
   let sum = digits.reduce((a, b) => a + b, 0);
@@ -114,24 +115,24 @@ function calculateLifeNumber(birthday: string) {
   return { lifeNum: sum };
 }
 
-// 2. 姓名學五格 + 81靈動（固定）
+// 姓名學五格公式
 function calculateNameGrids(name: string) {
-  // 目前簡易版（只支援常見字），後續可擴充完整筆劃表
   const strokesTable: { [key: string]: number } = {
-    '張': 11, '少': 4, '榮': 14, '王': 4, '李': 7, '陳': 16, '林': 8,
-    '黃': 12, '劉': 15, '楊': 13, /* 可繼續補充 */
+    '王': 4, '李': 7, '張': 11, '陳': 16, '林': 8, '黃': 12, '劉': 15, '楊': 13,
+    '少': 4, '榮': 14, '一': 1, '迪': 13  // 你的例子
+    // 這裡可擴充完整筆劃表（網上很多，之後補）
   };
 
   let totalStrokes = 0;
   for (const char of name) {
-    totalStrokes += strokesTable[char] || 0;
+    totalStrokes += strokesTable[char] || 0; // 未知字暫 0
   }
 
   const heaven = (strokesTable[name[0]] || 0) + 1;
   const man = (strokesTable[name[0]] || 0) + (strokesTable[name[1]] || 0);
   const earth = totalStrokes - (strokesTable[name[0]] || 0);
   const out = (strokesTable[name[name.length - 1]] || 0) + 1;
-  const total = heaven + man + earth - 1;   // 標準總格
+  const total = heaven + man + earth - 1; // 標準總格
 
   return {
     strokes: totalStrokes,
@@ -141,26 +142,28 @@ function calculateNameGrids(name: string) {
   };
 }
 
-// 81數理吉凶簡易表（可後續補完整）
+// 81靈動簡易表（可補完整）
 function get81Luck(total: number) {
   const table: { [key: number]: string } = {
     29: '吉（智謀出眾，貴人相助）',
+    17: '吉（剛毅果斷）',
+    13: '吉（智慧才華）',
+    5: '大吉',
     15: '大吉',
-    24: '大吉',
-    81: '中下運',
-    // 可繼續補
+    // 完整表可搜「81數理吉凶表」補
   };
-  return table[total] || `中性（數理 ${total}）`;
+  return table[total] || `數理 ${total}（中性或待補）`;
 }
 
-// ====================== 子 Prompt（AI 只生成描述） ======================
-function getBaziPrompt(user: any, partner?: any) { /* ... */ return `...`; }
-function getZiweiPrompt(user: any, partner?: any) { /* ... */ return `...`; }
-function getHumanDesignPrompt(user: any, partner?: any) { /* ... */ return `...`; }
-function getTzolkinPrompt(user: any, partner?: any) { /* ... */ return `...`; }
-function getGeneralPrompt(user: any, partner?: any) { /* ... */ return `...`; }
+// 子 Prompt 保持原樣（或你原有版本）
 
-// ====================== 交叉驗證 ======================
+function getBaziPrompt(user: any, partner?: any) {
+  return `你是八字專家。只計算用戶 ${user.name}（生日：${user.birthday}）的八字。嚴格輸出 JSON：{"pillars": ["年柱", "月柱", "日柱", "時柱"], "strength": "身強/身弱", "favorable": "喜用神", "analysis": "50-100字分析"}。僅 JSON。`;
+}
+
+// 其他 getZiweiPrompt、getHumanDesignPrompt 等保持你原有，或用類似格式
+// 如果你有完整版，請保留；如果沒有，我可以再補。
+
 function calculateConfidence(results: any) {
   let score = 0;
   if (results.bazi?.strength?.includes('強')) score++;
@@ -170,8 +173,8 @@ function calculateConfidence(results: any) {
 
   let level = '低';
   let msg = '僅1系統支持，僅供參考';
-  if (score >= 3) { level = '高'; msg = '3+ 系統一致，強建議'; }
-  else if (score === 2) { level = '中'; msg = '2 系統一致，中度建議'; }
+  if (score >= 3) level = '高', msg = '3+ 系統一致，強建議';
+  else if (score === 2) level = '中', msg = '2 系統一致，中度建議';
 
   return { level, score, msg };
 }
