@@ -1,24 +1,35 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ... 你原有 CORS 和 method 檢查
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: '尚未設定 GROQ_API_KEY' });
 
   const { user, partner } = req.body;
 
   try {
-    // 先用公式算靜態數字
-    const numerologyStatic = calculateNumerology(user.birthday); // 生命靈數公式
-    const nameAnalysisStatic = calculateNameAnalysis(user.name); // 81靈動公式
+    // 拆分呼叫 + 防崩潰
+    let bazi = {};
+    let ziwei = {};
+    let nameAnalysis = {};
+    let humanDesign = {};
+    let tzolkin = {};
+    let general = {};
 
-    // 再呼叫 Groq，只生成描述
-    const bazi = await callGroq(apiKey, getBaziPrompt(user, partner));
-    const ziwei = await callGroq(apiKey, getZiweiPrompt(user, partner));
-    const nameAnalysisDesc = await callGroq(apiKey, getNameAnalysisDescPrompt(user, nameAnalysisStatic)); // 只生成描述
-    const humanDesign = await callGroq(apiKey, getHumanDesignPrompt(user, partner));
-    const numerologyDesc = await callGroq(apiKey, getNumerologyDescPrompt(user, numerologyStatic)); // 只生成描述
-    const tzolkin = await callGroq(apiKey, getTzolkinPrompt(user, partner));
+    try { bazi = await callGroq(apiKey, getBaziPrompt(user, partner)); } catch (e) { console.error('Bazi error:', e); }
+    try { ziwei = await callGroq(apiKey, getZiweiPrompt(user, partner)); } catch (e) { console.error('Ziwei error:', e); }
+    try { nameAnalysis = await callGroq(apiKey, getNameAnalysisPrompt(user, partner)); } catch (e) { console.error('NameAnalysis error:', e); }
+    try { humanDesign = await callGroq(apiKey, getHumanDesignPrompt(user, partner)); } catch (e) { console.error('HumanDesign error:', e); }
+    try { tzolkin = await callGroq(apiKey, getTzolkinPrompt(user, partner)); } catch (e) { console.error('Tzolkin error:', e); }
+    try { general = await callGroq(apiKey, getGeneralPrompt(user, partner)); } catch (e) { console.error('General error:', e); }
 
-    // 交叉驗證
     const confidence = calculateConfidence({ bazi, ziwei, humanDesign, tzolkin });
 
     const result = {
@@ -26,77 +37,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         eastern: {
           bazi,
           ziwei,
-          nameAnalysis: { ...nameAnalysisStatic, ...nameAnalysisDesc } // 合併公式 + 描述
+          nameAnalysis
         },
         western: {
           humanDesign,
-          numerology: { ...numerologyStatic, ...numerologyDesc }, // 合併
+          numerology: general.numerology || { lifeNum: 0, grid: [], arrows: [], personalYear: "" },
           tzolkin
         }
       },
-      // ... 其他
+      relationship: general.relationship || {},
+      dailyAdvice: general.dailyAdvice || "無法生成建議，請重試",
+      luckyIndicators: general.luckyIndicators || { color: "未知", direction: "未知", action: ["請稍後重試"] },
       confidence
     };
 
     return res.status(200).json(result);
   } catch (err: any) {
-    // ... 錯誤處理
+    console.error('Metaphysics handler error:', err);
+    return res.status(500).json({ error: err.message || '維度連結超時或模型忙碌，請稍後重試' });
   }
 }
 
-// 新增公式函式（生命靈數）
-function calculateNumerology(birthday: string) {
-  const [year, month, day] = birthday.split('-').map(Number);
-  let sum = year + month + day;
-  while (sum > 9 && sum !== 11 && sum !== 22 && sum !== 33) {
-    sum = sum.toString().split('').reduce((a, b) => Number(a) + Number(b), 0);
+// 共用呼叫 Groq（已存在）
+async function callGroq(apiKey: string, prompt: string) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: "You are Aetheris, a professional metaphysics AI. Always respond in valid JSON only, no extra text." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.6,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || 'Groq request failed');
   }
-  return { lifeNum: sum, grid: [], arrows: [], personalYear: '' }; // grid/arrows/personalYear 暫空，後續加
+
+  const data = await response.json();
+  let content = data.choices[0]?.message?.content || '{}';
+  try {
+    return JSON.parse(content);
+  } catch (parseErr) {
+    console.error('JSON parse error:', parseErr, content);
+    return {};
+  }
 }
 
-// 新增公式函式（姓名學 + 81靈動）
-function calculateNameAnalysis(name: string) {
-  // 假設簡體中文筆劃計算（需實際筆劃表）
-  const strokes = name.split('').reduce((total, char) => total + getStrokes(char), 0); // getStrokes 是筆劃函式
-  const heaven = /* 姓筆劃 + 1 */;
-  const man = /* 姓末 + 名首 */;
-  const earth = /* 名筆劃 */;
-  const out = /* 名末 + 1 */;
-  const total = heaven + man + earth;
-  const luck81 = get81Luck(total % 81); // 81表查詢函式
+// 你的子 Prompt 函式（保持原樣，或確認是否遺漏）
 
-  return {
-    strokes,
-    fiveGrids: { heaven, man, earth, out, total },
-    luck81: '', // 公式算數字，AI生成描述
-    threeTalents: ''
-  };
-}
-
-// 範例筆劃/81表函式（你可擴充）
-function getStrokes(char: string) { // 簡易表，實際用完整字典
-  const strokesTable: { [key: string]: number } = { '王': 4, '小': 3 /* ... */ };
-  return strokesTable[char] || 0;
-}
-
-function get81Luck(num: number) { // 81表簡例
-  if (num === 1) return '大吉';
-  if (num === 81) return '中下運'; // 你的例子
-  return '未知';
-}
-
-// 修改子 Prompt（AI 只生成描述，不算數字）
-function getNumerologyDescPrompt(user: any, staticData: any) {
-  return `你是數字命理專家。只生成用戶 ${user.name} 的生命靈數描述。已知 lifeNum: ${staticData.lifeNum}。輸出 JSON：{"personalYear": "今年流年解析", "analysis": "50-100字"}。僅 JSON。`;
-}
-
-function getNameAnalysisDescPrompt(user: any, staticData: any) {
-  return `你是姓名學專家。只生成用戶 ${user.name} 的姓名學描述。已知 fiveGrids: ${JSON.stringify(staticData.fiveGrids)}。輸出 JSON：{"luck81": "靈動數解析", "threeTalents": "三才影響"}。僅 JSON。`;
-}
-
-// ... 其他子 Prompt 類似，只生成 "analysis" 或 "luck" 描述
-
-// 交叉驗證函式（保留）
+// 交叉驗證（保持原樣，或簡化防 undefined）
 function calculateConfidence(results: any) {
-  // ... 你原有邏輯
+  let score = 0;
+  try {
+    if (results.bazi?.strength?.includes('強') && results.ziwei?.luck?.includes('吉')) score++;
+    if (results.humanDesign?.type === 'Generator' && results.tzolkin?.tone?.includes('高')) score++;
+    if (results.nameAnalysis?.luck81?.includes('吉')) score++;
+  } catch (e) {
+    console.error('Confidence calc error:', e);
+  }
+
+  let level = '低';
+  let msg = '僅1系統支持，僅供參考';
+  if (score >= 3) {
+    level = '高';
+    msg = '3+ 系統一致，強建議';
+  } else if (score === 2) {
+    level = '中';
+    msg = '2 系統一致，中度建議';
+  }
+
+  return { level, score, msg };
 }
