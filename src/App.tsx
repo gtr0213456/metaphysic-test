@@ -4,14 +4,14 @@ import { MetaphysicalEngine, MetaphysicResult } from './services/metaphysicalEng
 function DataTag({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[9px] uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-1">{label}</span>
-      <span className="text-sm font-bold text-slate-200">{value || '---'}</span>
-      {sub && <span className="text-[10px] text-slate-500 mt-1">{sub}</span>}
+      <span className="text-xs uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-1">{label}</span>
+      <span className="text-base font-bold text-slate-200">{value || '---'}</span> {/* 大一階：text-base */}
+      {sub && <span className="text-sm text-slate-500 mt-1">{sub}</span>} {/* sub 也稍加大 */}
     </div>
   );
 }
 
-// 新增：一致度徽章組件
+// 一致度徽章組件（保留上次加的）
 function ConfidenceBadge({ level, msg }: { level?: '高' | '中' | '低'; msg?: string }) {
   if (!level) return null;
 
@@ -125,7 +125,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* 新增：一致度徽章區塊 */}
+        {/* 一致度徽章 */}
         {data && data.confidence && (
           <div className="flex justify-center mb-6">
             <ConfidenceBadge level={data.confidence.level} msg={data.confidence.msg} />
@@ -135,20 +135,23 @@ export default function App() {
         {/* 結果展示 */}
         {data && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-            {/* 1. 今日決策區 */}
+            {/* 1. 今日決策區 - 加大幸運色、方位、今日宜 */}
             <div className="bg-gradient-to-br from-indigo-900/40 to-transparent border border-indigo-500/30 rounded-[3rem] p-10 backdrop-blur-3xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-8 opacity-10 text-6xl italic font-black">2026</div>
-              <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase mb-6">Daily Strategic Decision</h3>
+              <h3 className="text-sm font-black tracking-widest text-indigo-400 uppercase mb-6">Daily Strategic Decision</h3> {/* 標題加大 */}
               <p className="text-2xl font-serif italic text-white mb-8 leading-relaxed">"{data.dailyAdvice}"</p>
 
               <div className="grid grid-cols-3 gap-6 pt-8 border-t border-white/10">
-                <DataTag label="幸運色" value={data.luckyIndicators.color} />
+                <DataTag label="幸運色" value={data.luckyIndicators.color} /> {/* value 已 text-base */}
                 <DataTag label="幸運方位" value={data.luckyIndicators.direction} />
                 <div className="col-span-1">
-                  <span className="text-[9px] uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-2 block">今日宜</span>
+                  <span className="text-sm uppercase tracking-[0.2em] text-indigo-400/60 font-bold mb-2 block">今日宜</span> {/* label 加大到 text-sm */}
                   <div className="flex flex-wrap gap-2">
                     {data.luckyIndicators.action.map((act, i) => (
-                      <span key={i} className="text-[10px] bg-indigo-500/20 text-indigo-200 px-2 py-1 rounded-md border border-indigo-500/30">
+                      <span 
+                        key={i} 
+                        className="text-base bg-indigo-500/20 text-indigo-200 px-3 py-1.5 rounded-md border border-indigo-500/30" {/* 行動標籤加大 */}
+                      >
                         {act}
                       </span>
                     ))}
@@ -157,26 +160,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2. 玄學細節區 - 加 badge */}
+            {/* 2. 玄學細節區 - EASTERN / WESTERN 標題加大 + 內容大一階 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 space-y-6 relative">
-                <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Eastern</h3>
-                {/* 加 Eastern 一致度小徽章 */}
+                <h3 className="text-sm font-black tracking-widest text-indigo-400 uppercase mb-6">Eastern</h3> {/* 加大 */}
                 <div className="absolute top-4 right-4">
                   <ConfidenceBadge level={data.confidence?.level} />
                 </div>
-                <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用：${data.personal.eastern.bazi.favorable}`} />
-                <DataTag label="姓名五格" value={`總格 ${data.personal.eastern.nameAnalysis.fiveGrids.total}`} sub={data.personal.eastern.nameAnalysis.luck81} />
+                <DataTag label="八字四柱" value={data.personal.eastern.bazi.pillars.join(' ')} sub={`喜用：${data.personal.eastern.bazi.favorable}`} /> {/* value 已 text-base */}
+                <DataTag label="姓名五格" value={`總格 ${data.personal.eastern.nameAnalysis.fiveGrids.total}`} sub={data.personal.eastern.nameAnalysis.luck81} /> {/* 81數內容已大 */}
               </div>
 
               <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 space-y-6 relative">
-                <h3 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Western</h3>
-                {/* 加 Western 一致度小徽章 */}
+                <h3 className="text-sm font-black tracking-widest text-indigo-400 uppercase mb-6">Western</h3> {/* 加大 */}
                 <div className="absolute top-4 right-4">
                   <ConfidenceBadge level={data.confidence?.level} />
                 </div>
-                <DataTag label="人類圖" value={data.personal.western.humanDesign.type} sub={data.personal.western.humanDesign.authority} />
-                <DataTag label="生命靈數" value={`主命數 ${data.personal.western.numerology.lifeNum}`} sub={`個人年：${data.personal.western.numerology.personalYear}`} />
+                <DataTag label="人類圖" value={data.personal.western.humanDesign.type} sub={data.personal.western.humanDesign.authority} /> {/* 大一階 */}
+                <DataTag label="生命靈數" value={`主命數 ${data.personal.western.numerology.lifeNum}`} sub={`個人年：${data.personal.western.numerology.personalYear}`} /> {/* 大一階 */}
               </div>
             </div>
 
@@ -184,14 +185,14 @@ export default function App() {
             {mode === 'relationship' && data.relationship && (
               <div className="bg-gradient-to-r from-pink-900/20 to-indigo-900/20 border border-pink-500/30 rounded-[3rem] p-10">
                 <div className="flex justify-between items-end mb-8">
-                  <h3 className="text-[10px] font-black tracking-widest text-pink-400 uppercase">Resonance</h3>
+                  <h3 className="text-sm font-black tracking-widest text-pink-400 uppercase">Resonance</h3> {/* 加大 */}
                   <span className="text-4xl font-black italic">{data.relationship.syncScore}%</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <DataTag label="和諧程度" value={data.relationship.harmony} />
                   <DataTag label="溝通建議" value={data.relationship.communicationTone} />
                   <div className="col-span-full bg-black/40 p-4 rounded-2xl border border-white/5">
-                    <p className="text-xs text-pink-200/70 leading-relaxed">
+                    <p className="text-sm text-pink-200/70 leading-relaxed"> {/* 預警文字稍加大 */}
                       <span className="text-pink-500 font-bold">預警：</span>{data.relationship.warning}
                     </p>
                   </div>
