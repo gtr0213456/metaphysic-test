@@ -62,9 +62,9 @@ export class MetaphysicalEngine {
       return data as MetaphysicResult;
 
     } catch (error: any) {
-      console.error("MetaphysicalEngine Error:", error);
-      // 統一錯誤訊息給 UI 顯示
-      throw new Error(error.message || "未知錯誤，請檢查連線");
-    }
+  console.error("MetaphysicalEngine Error:", error);
+  const errorMsg = error.message || JSON.stringify(error) || "未知錯誤，請檢查連線";
+  throw new Error(errorMsg);  // 讓 alert 顯示完整訊息
+}
   }
 }
