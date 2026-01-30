@@ -19,24 +19,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const results: any = {};
+    let results: any = {};
 
-    // 逐個呼叫，獨立 try-catch 防單一失敗影響全部
-    const prompts = [
-      { key: 'bazi', prompt: getBaziPrompt(user, partner) },
-      { key: 'ziwei', prompt: getZiweiPrompt(user, partner) },
-      { key: 'nameAnalysis', prompt: getNameAnalysisPrompt(user, partner) },
-      { key: 'humanDesign', prompt: getHumanDesignPrompt(user, partner) },
-      { key: 'tzolkin', prompt: getTzolkinPrompt(user, partner) },
-      { key: 'general', prompt: getGeneralPrompt(user, partner) }
+    // 逐個呼叫，防單一失敗
+    const promptFunctions = [
+      { key: 'bazi', fn: getBaziPrompt },
+      { key: 'ziwei', fn: getZiweiPrompt },
+      { key: 'nameAnalysis', fn: getNameAnalysisPrompt },
+      { key: 'humanDesign', fn: getHumanDesignPrompt },
+      { key: 'tzolkin', fn: getTzolkinPrompt },
+      { key: 'general', fn: getGeneralPrompt }
     ];
 
-    for (const { key, prompt } of prompts) {
+    for (const { key, fn } of promptFunctions) {
       try {
+        const prompt = fn(user, partner);
         results[key] = await callGroq(apiKey, prompt);
       } catch (e) {
         console.error(`${key} failed:`, e);
-        results[key] = {}; // fallback 空物件
+        results[key] = {};
       }
     }
 
@@ -68,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// 呼叫 Groq（加強 JSON 解析防呆）
+// 共用 Groq 呼叫
 async function callGroq(apiKey: string, prompt: string) {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -82,7 +83,7 @@ async function callGroq(apiKey: string, prompt: string) {
         { role: "system", content: "You are Aetheris. Respond ONLY with valid JSON, no other text, no markdown." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.3,  // 降低到 0.3 減少變異
+      temperature: 0.3,  // 降低變異
       max_tokens: 500,
       response_format: { type: "json_object" }
     })
@@ -104,18 +105,46 @@ async function callGroq(apiKey: string, prompt: string) {
   }
 }
 
-// 你的子 Prompt 函式（保持原樣，或確認完整）
+// 子 Prompt 函式（全部定義在這裡）
+function getBaziPrompt(user: any, partner?: any) {
+  return `你是八字專家。只計算用戶 ${user.name}（生日：${user.birthday}）的八字。${
+    partner ? `合盤對象：${partner.name}（${partner.birthday}）。` : ''
+  }嚴格輸出 JSON：{"pillars": ["年柱", "月柱", "日柱", "時柱"], "strength": "身強/身弱描述", "favorable": "喜用神", "analysis": "50-100字專業分析"}。僅 JSON，無其他文字。`;
+}
 
-// 交叉驗證（防 undefined）
+function getZiweiPrompt(user: any, partner?: any) {
+  return `你是紫微斗數專家。只計算用戶 ${user.name}（生日：${user.birthday}）的紫微命盤。${
+    partner ? `合盤對象：${partner.name}（${partner.birthday}）。` : ''
+  }輸出 JSON：{"mainStars": "主星名稱", "palace": "命宮位置", "luck": "流年運勢解析"}。僅 JSON。`;
+}
+
+function getNameAnalysisPrompt(user: any, partner?: any) {
+  return `你是姓名學專家。只計算用戶 ${user.name} 的姓名學五格。輸出 JSON：{"strokes": 總筆劃, "fiveGrids": {"heaven":數字, "man":數字, "earth":數字, "out":數字, "total":數字}, "luck81": "81數解析", "threeTalents": "三才影響"}。僅 JSON。`;
+}
+
+function getHumanDesignPrompt(user: any, partner?: any) {
+  return `你是 Human Design 專家。只計算用戶 ${user.name}（生日：${user.birthday}）的類型。輸出 JSON：{"type": "類型", "authority": "權威", "strategy": "策略", "profile": "角色", "channels": ["通道1", "通道2"], "analysis": "50-100字靈魂藍圖解析"}。僅 JSON。`;
+}
+
+function getTzolkinPrompt(user: any, partner?: any) {
+  return `你是卓爾金專家。只計算用戶 ${user.name}（生日：${user.birthday}）的卓爾金。輸出 JSON：{"kin": "Kin號", "totem": "圖騰", "tone": "調性", "wave": "波符", "analysis": "瑪雅曆靈性指引"}。僅 JSON。`;
+}
+
+function getGeneralPrompt(user: any, partner?: any) {
+  return `你是玄學 AI。只計算每日建議與幸運指標。用戶：${user.name}（${user.birthday}）。${
+    partner ? `合盤：${partner.name}（${partner.birthday}）。` : ''
+  }輸出 JSON：{"dailyAdvice": "今日建議", "luckyIndicators": {"color": "色", "direction": "方", "action": ["行動1", "行動2"]}, "relationship": {"syncScore":數字, "harmony": "描述", "advice": "建議", "warning": "警示", "communicationTone": "語調"}}。僅 JSON。`;
+}
+
+// 交叉驗證
 function calculateConfidence(results: any) {
   let score = 0;
   try {
-    if (results.bazi?.strength && results.bazi.strength.includes('強')) score++;
-    if (results.ziwei?.luck && results.ziwei.luck.includes('吉')) score++;
-    if (results.humanDesign?.type && results.humanDesign.type === 'Generator') score++;
-    if (results.tzolkin?.tone && results.tzolkin.tone.includes('高')) score++;
+    if (results.bazi?.strength?.includes('強') && results.ziwei?.luck?.includes('吉')) score++;
+    if (results.humanDesign?.type === 'Generator' && results.tzolkin?.tone?.includes('高')) score++;
+    if (results.nameAnalysis?.luck81?.includes('吉')) score++;
   } catch (e) {
-    console.error('Confidence error:', e);
+    console.error('Confidence calc error:', e);
   }
 
   let level = '低';
@@ -130,5 +159,3 @@ function calculateConfidence(results: any) {
 
   return { level, score, msg };
 }
-
-// 其他 Prompt 函式（請確保你有完整定義，如果遺漏會回 {}）
