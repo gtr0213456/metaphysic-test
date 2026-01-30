@@ -12,53 +12,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return res.status(500).json({ error: '尚未設定 GROQ_API_KEY' });
 
-  const { user, partner } = req.body;
+  const { user, partner } = req.body || {};
+
+  if (!user || !user.name || !user.birthday) {
+    return res.status(400).json({ error: '缺少用戶姓名或生日' });
+  }
 
   try {
-    // 拆分呼叫 + 防崩潰
-    let bazi = {};
-    let ziwei = {};
-    let nameAnalysis = {};
-    let humanDesign = {};
-    let tzolkin = {};
-    let general = {};
+    const results: any = {};
 
-    try { bazi = await callGroq(apiKey, getBaziPrompt(user, partner)); } catch (e) { console.error('Bazi error:', e); }
-    try { ziwei = await callGroq(apiKey, getZiweiPrompt(user, partner)); } catch (e) { console.error('Ziwei error:', e); }
-    try { nameAnalysis = await callGroq(apiKey, getNameAnalysisPrompt(user, partner)); } catch (e) { console.error('NameAnalysis error:', e); }
-    try { humanDesign = await callGroq(apiKey, getHumanDesignPrompt(user, partner)); } catch (e) { console.error('HumanDesign error:', e); }
-    try { tzolkin = await callGroq(apiKey, getTzolkinPrompt(user, partner)); } catch (e) { console.error('Tzolkin error:', e); }
-    try { general = await callGroq(apiKey, getGeneralPrompt(user, partner)); } catch (e) { console.error('General error:', e); }
+    // 逐個呼叫，獨立 try-catch 防單一失敗影響全部
+    const prompts = [
+      { key: 'bazi', prompt: getBaziPrompt(user, partner) },
+      { key: 'ziwei', prompt: getZiweiPrompt(user, partner) },
+      { key: 'nameAnalysis', prompt: getNameAnalysisPrompt(user, partner) },
+      { key: 'humanDesign', prompt: getHumanDesignPrompt(user, partner) },
+      { key: 'tzolkin', prompt: getTzolkinPrompt(user, partner) },
+      { key: 'general', prompt: getGeneralPrompt(user, partner) }
+    ];
 
-    const confidence = calculateConfidence({ bazi, ziwei, humanDesign, tzolkin });
+    for (const { key, prompt } of prompts) {
+      try {
+        results[key] = await callGroq(apiKey, prompt);
+      } catch (e) {
+        console.error(`${key} failed:`, e);
+        results[key] = {}; // fallback 空物件
+      }
+    }
+
+    const confidence = calculateConfidence(results);
 
     const result = {
       personal: {
         eastern: {
-          bazi,
-          ziwei,
-          nameAnalysis
+          bazi: results.bazi || {},
+          ziwei: results.ziwei || {},
+          nameAnalysis: results.nameAnalysis || {}
         },
         western: {
-          humanDesign,
-          numerology: general.numerology || { lifeNum: 0, grid: [], arrows: [], personalYear: "" },
-          tzolkin
+          humanDesign: results.humanDesign || {},
+          numerology: results.general?.numerology || { lifeNum: 0, grid: [], arrows: [], personalYear: "" },
+          tzolkin: results.tzolkin || {}
         }
       },
-      relationship: general.relationship || {},
-      dailyAdvice: general.dailyAdvice || "無法生成建議，請重試",
-      luckyIndicators: general.luckyIndicators || { color: "未知", direction: "未知", action: ["請稍後重試"] },
+      relationship: results.general?.relationship || {},
+      dailyAdvice: results.general?.dailyAdvice || "暫時無法生成，請重試",
+      luckyIndicators: results.general?.luckyIndicators || { color: "未知", direction: "未知", action: ["請重試"] },
       confidence
     };
 
     return res.status(200).json(result);
   } catch (err: any) {
-    console.error('Metaphysics handler error:', err);
-    return res.status(500).json({ error: err.message || '維度連結超時或模型忙碌，請稍後重試' });
+    console.error('Handler error:', err);
+    return res.status(500).json({ error: err.message || '伺服器錯誤，請稍後重試' });
   }
 }
 
-// 共用呼叫 Groq（已存在）
+// 呼叫 Groq（加強 JSON 解析防呆）
 async function callGroq(apiKey: string, prompt: string) {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -69,40 +79,43 @@ async function callGroq(apiKey: string, prompt: string) {
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: "You are Aetheris, a professional metaphysics AI. Always respond in valid JSON only, no extra text." },
+        { role: "system", content: "You are Aetheris. Respond ONLY with valid JSON, no other text, no markdown." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.6,
+      temperature: 0.3,  // 降低到 0.3 減少變異
+      max_tokens: 500,
       response_format: { type: "json_object" }
     })
   });
 
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || 'Groq request failed');
+    const errData = await response.text();
+    throw new Error(`Groq error: ${response.status} - ${errData}`);
   }
 
   const data = await response.json();
-  let content = data.choices[0]?.message?.content || '{}';
+  const content = data.choices?.[0]?.message?.content || '{}';
+
   try {
     return JSON.parse(content);
   } catch (parseErr) {
-    console.error('JSON parse error:', parseErr, content);
+    console.error('JSON parse failed:', parseErr, content);
     return {};
   }
 }
 
-// 你的子 Prompt 函式（保持原樣，或確認是否遺漏）
+// 你的子 Prompt 函式（保持原樣，或確認完整）
 
-// 交叉驗證（保持原樣，或簡化防 undefined）
+// 交叉驗證（防 undefined）
 function calculateConfidence(results: any) {
   let score = 0;
   try {
-    if (results.bazi?.strength?.includes('強') && results.ziwei?.luck?.includes('吉')) score++;
-    if (results.humanDesign?.type === 'Generator' && results.tzolkin?.tone?.includes('高')) score++;
-    if (results.nameAnalysis?.luck81?.includes('吉')) score++;
+    if (results.bazi?.strength && results.bazi.strength.includes('強')) score++;
+    if (results.ziwei?.luck && results.ziwei.luck.includes('吉')) score++;
+    if (results.humanDesign?.type && results.humanDesign.type === 'Generator') score++;
+    if (results.tzolkin?.tone && results.tzolkin.tone.includes('高')) score++;
   } catch (e) {
-    console.error('Confidence calc error:', e);
+    console.error('Confidence error:', e);
   }
 
   let level = '低';
@@ -117,3 +130,5 @@ function calculateConfidence(results: any) {
 
   return { level, score, msg };
 }
+
+// 其他 Prompt 函式（請確保你有完整定義，如果遺漏會回 {}）
