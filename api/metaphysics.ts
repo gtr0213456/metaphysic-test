@@ -65,6 +65,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(JSON.parse(content));
 
   } catch (err: any) {
-    return res.status(500).json({ error: '維度連結超時，請重試' });
-  }
+  console.error('Groq API error:', err);
+  return res.status(500).json({ 
+    error: '維度連結超時或模型忙碌，請稍後重試' 
+  });
 }
